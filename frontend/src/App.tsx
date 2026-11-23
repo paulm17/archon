@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, Outlet, Navigate } from 'react-router-dom';
-import { Container, Tabs } from '@mantine/core';
+import { BrowserRouter, Routes, Route, useLocation, Outlet, Navigate } from 'react-router-dom';
+import { Container } from '@mantine/core';
+import { WorkspaceShell } from './WorkspaceShell';
 import BiblePage from './bible/biblePage';
 import { AskAiPage } from './ask-ai/askAiPage';
 import { CategoriesPage } from './note-ui/categoriesPage';
@@ -12,31 +13,17 @@ import { TranslationPage } from './translation/translationPage';
 import { YTVideoPage } from './ytvideo/ytVideoPage';
 
 function Layout() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const currentTab = location.pathname.split('/')[1] || 'bible';
-  const isChildWindow = new URLSearchParams(location.search).get('child') === '1';
+  const { search } = useLocation();
+  if (new URLSearchParams(search).get('child') === '1') {
+    return <Container size="95%" py="lg"><Outlet /></Container>;
+  }
 
-  return (
-    <Container size="95%" py="lg">
-      {isChildWindow ? (
-        <Outlet />
-      ) : (
-        <Tabs value={currentTab} onChange={(value) => navigate(`/${value}`)}>
-          <Tabs.List>
-            <Tabs.Tab value="bible">Bible</Tabs.Tab>
-            <Tabs.Tab value="notes">Notes</Tabs.Tab>
-            <Tabs.Tab value="ask-ai">Ask AI</Tabs.Tab>
-            <Tabs.Tab value="translation">Translations</Tabs.Tab>
-            <Tabs.Tab value="yt-video">YT Videos</Tabs.Tab>
-          </Tabs.List>
-          <div style={{ paddingTop: 16 }}>
-            <Outlet />
-          </div>
-        </Tabs>
-      )}
-    </Container>
-  );
+  return <WorkspaceShell />;
+}
+
+function BibleRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/bible', search }} replace />;
 }
 
 export default function App() {
@@ -44,7 +31,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/bible" replace />} />
+          <Route index element={<BibleRedirect />} />
           <Route path="bible" element={<BiblePage />} />
           <Route path="notes" element={<NotesPage />}>
             <Route index element={<NotesIndexRedirect />} />

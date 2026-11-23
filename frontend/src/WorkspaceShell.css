@@ -1,0 +1,34 @@
+nav.workspace-rail {
+  background: #202226;
+  align-items: center;
+  padding-block: 12px;
+  gap: 9px;
+  overflow-y: auto;
+}
+.workspace-rail a {
+  width: min(48px, calc(100% - 12px));
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #35383e;
+  color: #ecedf1;
+}
+.workspace-rail a:hover, .workspace-rail a[aria-current] {
+  background: #426bd6;
+  border-radius: 15px;
+}
+.workspace-rail a[aria-current]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  height: 27px;
+  width: 3px;
+  background: white;
+  border-radius: 0 4px 4px 0;
+}
+.workspace-rail a:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}

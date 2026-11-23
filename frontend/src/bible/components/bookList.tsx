@@ -44,7 +44,7 @@ export function BookList({ fetchChapter }: BookListProps) {
     <Popover
       opened={bookModalOpen}
       onChange={setBookModalOpen}
-      width={800}
+      width="min(800px, calc(100vw - 16px))"
       position="bottom-start"
       shadow="md"
     >

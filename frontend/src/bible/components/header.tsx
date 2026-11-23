@@ -105,9 +105,9 @@ export function Header({ handleSubmit, handleReset, fetchChapter }: HeaderProps)
           data-lpignore="true"
           data-form-type="other"
           disabled={hasSearched}
-          style={{ flex: 1 }}
+          flex={{ base: '1 1 100%', md: 1 }}
         />
-        <Box style={{ width: '220px' }}>
+        <Box w={{ base: '100%', md: 220 }}>
           <Select
             label="Gospel"
             value={gospel}
@@ -119,7 +119,7 @@ export function Header({ handleSubmit, handleReset, fetchChapter }: HeaderProps)
             disabled={hasSearched}
           />
         </Box>
-        <Box style={{ width: '325px' }}>
+        <Box w={{ base: '100%', md: 325 }}>
           <Select
             label="Translation"
             value={version}
