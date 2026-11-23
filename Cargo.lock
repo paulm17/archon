@@ -242,6 +242,7 @@ dependencies = [
  "anyhow",
  "archon_json",
  "archon_scraper",
+ "archon_scripture",
  "async-graphql",
  "axum 0.8.8",
  "base64 0.22.1",
@@ -311,6 +312,19 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "archon_scripture"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "indicatif 0.17.11",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

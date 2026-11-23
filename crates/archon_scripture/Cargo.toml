@@ -1,0 +1,13 @@
+[package]
+name = "archon_scripture"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+byteorder = "1"
+indicatif = "0.17"
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"

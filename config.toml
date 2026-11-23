@@ -7,6 +7,9 @@ port = 8000
 storage_path = "./db_data"
 embedding = true
 
+[scripture-import]
+input_dir = "./output/json"
+
 [zenoh]
 # Mode: "peer" (default, forms mesh) or "client" (requires connect)
 mode = "peer"

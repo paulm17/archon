@@ -10,6 +10,7 @@ members = ["crates/*"]
 [dependencies]
 archon_scraper = { path = "crates/archon_scraper" }
 archon_json = { path = "crates/archon_json" }
+archon_scripture = { path = "crates/archon_scripture" }
 rust-cef = { path = "../rust-cef" }
 vardadb = { path = "../VardaDB" }
 tokio = { version = "1", features = ["full"] }
@@ -38,10 +39,10 @@ once_cell = "1.20"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 varda-client-rs = { path = "../VardaDB/client/rust" }
+tempfile = "3"
 
 [dev-dependencies]
 dashmap = "6.1.0"
-tempfile = "3"
 
 [[bin]]
 name = "archon"

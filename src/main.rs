@@ -50,6 +50,12 @@ enum Commands {
         #[arg(long, value_delimiter = ',')]
         translation: Vec<String>,
     },
+    /// Convert chapter JSON to JSONL and bulk-load a new scripture database
+    ScriptureImport {
+        /// Override scripture-import.input_dir from config.toml
+        #[arg(long)]
+        input: Option<std::path::PathBuf>,
+    },
     /// Database Management
     #[command(subcommand)]
     Db(vardadb::cli::DbCommands),
@@ -103,6 +109,65 @@ fn run_command(command: Commands) -> anyhow::Result<()> {
                     report.failed.len()
                 );
             }
+        }
+        Commands::ScriptureImport { input } => {
+            let config = startup::load_varda_config("config.toml")
+                .map_err(|e| anyhow::anyhow!("Failed to load config.toml: {e}"))?;
+            let storage = std::path::Path::new(&config.server.storage_path);
+            let destination = storage.join(archon_scripture::DATABASE_FILENAME);
+            let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+            let input = match input {
+                Some(path) => path,
+                None => {
+                    let text = std::fs::read_to_string("config.toml")?;
+                    let config: toml::Value = toml::from_str(&text)?;
+                    let path = config
+                        .get("scripture-import")
+                        .and_then(|section| section.get("input_dir"))
+                        .and_then(toml::Value::as_str)
+                        .filter(|path| !path.trim().is_empty())
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Set scripture-import.input_dir in config.toml")
+                        })?;
+                    std::path::PathBuf::from(path)
+                }
+            };
+            let name = archon_scripture::DATABASE_NAME;
+
+            let varda = vardadb::storage::backend::Storage::new(storage, config.server.node_id)?;
+            let registered = varda
+                .list_databases()
+                .into_iter()
+                .find(|(db, _)| db == name);
+            if let Some((_, path)) = &registered {
+                anyhow::ensure!(
+                    std::fs::canonicalize(path)? == std::fs::canonicalize(&destination)?,
+                    "Database {name} is registered at {path}"
+                );
+            }
+            let schema = root.join("schema/archon.graphql");
+            let schema = schema.to_string_lossy().into_owned();
+            std::fs::create_dir_all(&output)?;
+            let ingest = tempfile::Builder::new()
+                .prefix(".scripture-import-")
+                .tempdir_in(&output)?;
+            let rows = archon_scripture::import(&input, ingest.path(), storage)?;
+            if registered.is_none() {
+                varda.create_database(name)?;
+            }
+            drop(varda);
+            vardadb::cli::handle_db_command_direct(
+                &vardadb::cli::DbCommands::Apply {
+                    name: name.to_owned(),
+                    schema,
+                },
+                &config,
+            )?;
+            ingest.close()?;
+            println!(
+                "Imported {rows} scripture records into {}",
+                destination.display()
+            );
         }
         Commands::Json { translation } => {
             let selection: Vec<_> = translation.iter().map(String::as_str).collect();
