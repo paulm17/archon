@@ -1,0 +1,16 @@
+# Build artifacts
+target/
+frontend/node_modules/
+frontend/dist/
+
+# Runtime data / caches
+db_data/
+.fastembed_cache/
+.venv/
+.notes-import-checkpoint.json
+
+# Logs
+*.log
+
+# macOS
+.DS_Store

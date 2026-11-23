@@ -1,0 +1,543 @@
+
+type Language {
+  id: ID!
+  code: String! @unique @search(by: [term])
+  name: String! @search(by: [term])
+  translations: [Translations] @hasInverse(field: "language")
+}
+
+type Category {
+  id: ID!
+  name: String! @unique @search(by: [term])
+  bookCategories: [BookCategory] @hasInverse(field: "category")
+}
+
+type Translations {
+  id: ID!
+  code: String! @unique @search(by: [term])
+  name: String! @search(by: [term])
+  language: Language
+  bookTranslations: [BookTranslation] @hasInverse(field: "translation")
+  verseContents: [VerseContent] @hasInverse(field: "translation")
+  pythonInterlinearVerses: [PythonInterlinearVerse] @hasInverse(field: "translation")
+  pythonInterlinearTokens: [PythonInterlinearToken] @hasInverse(field: "translation")
+}
+
+type Book {
+  id: ID!
+  code: String! @unique @search(by: [term])
+  nameEn: String! @search(by: [term, fulltext])
+  nameHe: String
+  nameGr: String
+  bookCorpus: BookCorpus! @search(by: [term])
+  chapters: Int
+  bookTranslations: [BookTranslation] @hasInverse(field: "book")
+  bookCategories: [BookCategory] @hasInverse(field: "book")
+  summaries: [Summaries] @hasInverse(field: "book")
+}
+
+type BookTranslation {
+  id: ID!
+  book: Book
+  translation: Translations
+  chapters: [Chapter] @hasInverse(field: "bookTranslation")
+}
+
+type BookCategory {
+  id: ID!
+  book: Book
+  category: Category
+}
+
+type Chapter {
+  id: ID!
+  number: Int! @search(by: [int])
+  bookTranslation: BookTranslation
+  verses: [Verse] @hasInverse(field: "chapter")
+  summaries: [Summaries] @hasInverse(field: "chapter")
+}
+
+type Verse {
+  id: ID!
+  number: Int! @search(by: [int])
+  logionNumber: Int @search(by: [int])
+  chunkType: String
+  chapterHeading: String
+  sectionHeading: String
+  paragraphStart: Boolean
+  poetryIndent: Int
+  metadata: String # JSON represented as String for now
+  chapter: Chapter
+  chunks: [Chunk] @hasInverse(field: "verses")
+  verseContents: [VerseContent] @hasInverse(field: "verse")
+  interlinearTokens: [InterlinearToken] @hasInverse(field: "verse")
+  pythonInterlinearVerses: [PythonInterlinearVerse] @hasInverse(field: "sourceVerse")
+  verseEmbeddings: [VerseEmbeddings] @hasInverse(field: "verse")
+  syntaxRelations: [SyntaxRelations] @hasInverse(field: "verse")
+  entityMentions: [EntityMentions] @hasInverse(field: "verse")
+  alignments: [InterlinearAlignment] @hasInverse(field: "verse")
+}
+
+type PythonInterlinearVerse {
+  id: ID!
+  sourceVerse: Verse
+  translation: Translations
+  book: String @search(by: [term])
+  chapter: Int @search(by: [int])
+  verse: Int @search(by: [int])
+  headerText: String @search(by: [term, fulltext])
+  section: String @search(by: [term, fulltext])
+  paragraphStart: Boolean
+  poetryIndent: Int
+  rawJson: String
+  tokens: [PythonInterlinearToken] @hasInverse(field: "parityVerse")
+}
+
+type PythonInterlinearToken {
+  id: ID!
+  parityVerse: PythonInterlinearVerse
+  translation: Translations
+  languageCode: String @search(by: [term])
+  book: String @search(by: [term])
+  chapter: Int @search(by: [int])
+  verse: Int @search(by: [int])
+  contentIndex: Int @search(by: [int])
+  tokenIndex: Int @search(by: [int])
+  itemType: String @search(by: [term])
+  text: String @search(by: [term, fulltext])
+  sourceText: String @search(by: [term, fulltext])
+  lemma: String @search(by: [term, fulltext])
+  strong: String @search(by: [term])
+  morph: String @search(by: [term, fulltext])
+  gloss: String @search(by: [fulltext])
+  matched: Boolean
+  rawJson: String
+}
+
+type InterlinearToken {
+  id: ID!
+  verse: Verse
+  translation: Translations
+  languageCode: String @search(by: [term])
+  tokenIndex: Int! @search(by: [int])
+  strong: String @search(by: [term])
+  reference: String @search(by: [term])
+  transliteration: String @search(by: [term, fulltext])
+  original: String @search(by: [term, fulltext])
+  englishGloss: String @search(by: [fulltext])
+  grammar: String @search(by: [term, fulltext])
+  metadata: String
+}
+
+type VerseContent {
+  id: ID!
+  type: String! @search(by: [term])
+  text: String @search(by: [fulltext])
+  lemma: String
+  strong: String
+  morph: String
+  gloss: String
+  tokenId: String @search(by: [term])
+  tokenIndex: Int
+  normalizedText: String @search(by: [term])
+  verse: Verse
+  translation: Translations
+  tokenMorphologies: [TokenMorphology] @hasInverse(field: "verseContent")
+}
+
+type RootCluster {
+  id: ID! @unique @search(by: [term])
+  rootConsonants: String @search(by: [term])
+  lemmas: [Lemmas] @hasInverse(field: "root")
+}
+
+type Lemmas {
+  id: ID!
+  strongsId: String @search(by: [term])
+  languageCode: String
+  lemmaText: String
+  gloss: String
+  usage: String @search(by: [fulltext])
+  root: RootCluster
+  extendedDefinition: String # For full BDB dictionary entries
+  grammaticalNotes: String
+  wordnetLinks: [WordnetLinks] @hasInverse(field: "lemma")
+  lexiconEmbeddings: [LexiconEmbeddings] @hasInverse(field: "lemma")
+  syntaxRelationsSub: [SyntaxRelations] @hasInverse(field: "subjectLemma")
+  syntaxRelationsVerb: [SyntaxRelations] @hasInverse(field: "verbLemma")
+  syntaxRelationsObj: [SyntaxRelations] @hasInverse(field: "objectLemma")
+  alignments: [InterlinearAlignment] @hasInverse(field: "lemma")
+}
+
+type TokenMorphology {
+  id: ID!
+  tokenId: String @search(by: [term])
+  partOfSpeech: String
+  person: String
+  number: String
+  gender: String
+  tense: String
+  mood: String
+  voice: String
+  caseVal: String
+  verseContent: VerseContent
+}
+
+type Synset {
+  id: ID! @unique @search(by: [term])
+  gloss: String @search(by: [fulltext])
+  lemmas: [WordnetLinks] @hasInverse(field: "synset")
+  relatedSynsetsA: [SynsetRelations] @hasInverse(field: "synsetA")
+  relatedSynsetsB: [SynsetRelations] @hasInverse(field: "synsetB")
+}
+
+type SynsetRelations {
+  id: ID!
+  relationType: String @search(by: [term])
+  synsetA: Synset
+  synsetB: Synset
+}
+
+type WordnetLinks {
+  id: ID!
+  similarityScore: Float
+  lemma: Lemmas
+  synset: Synset
+}
+
+type Chunk {
+  id: ID!
+  chunkType: String! @search(by: [term]) # e.g., "3verse", "5verse", "paragraph"
+  text: String @search(by: [fulltext])
+  startVerse: Verse
+  endVerse: Verse
+  verses: [Verse] @hasInverse(field: "chunks")
+  chunkEmbeddings: [ChunkEmbeddings] @hasInverse(field: "chunk")
+}
+
+type ChunkEmbeddings {
+  id: ID!
+  modelName: String @search(by: [term])
+  embedding: [Float] @vector
+  chunk: Chunk
+}
+
+type VerseEmbeddings {
+  id: ID!
+  modelName: String
+  embedding: [Float] @vector
+  verse: Verse
+}
+
+type LexiconEmbeddings {
+  id: ID!
+  modelName: String
+  embedding: [Float] @vector
+  lemma: Lemmas
+}
+
+type LemmaSourceIndex {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  strongsId: String @search(by: [term])
+  lemmaText: String @search(by: [term, fulltext])
+  rawJson: String
+  lemma: Lemmas
+}
+
+type SyntaxDependency {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  tokenIndex: Int
+  tokenText: String @search(by: [term, fulltext])
+  lemmaText: String @search(by: [term, fulltext])
+  upos: String @search(by: [term])
+  xpos: String @search(by: [term])
+  head: Int
+  deprel: String @search(by: [term])
+  verse: Verse
+  rawJson: String
+}
+
+type SyntaxRelationDetail {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  sourceLang: String @search(by: [term])
+  relationType: String @search(by: [term])
+  subjectText: String @search(by: [term, fulltext])
+  verbText: String @search(by: [term, fulltext])
+  objectText: String @search(by: [term, fulltext])
+  subjectStrongsId: String @search(by: [term])
+  verbStrongsId: String @search(by: [term])
+  objectStrongsId: String @search(by: [term])
+  verse: Verse
+  subjectLemma: Lemmas
+  verbLemma: Lemmas
+  objectLemma: Lemmas
+  rawJson: String
+}
+
+type AlignmentDetail {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  tokenId: String @search(by: [term])
+  tokenIndex: Int
+  hebrewWord: String @search(by: [term, fulltext])
+  normalizedText: String @search(by: [term])
+  strongsId: String @search(by: [term])
+  lemmaText: String @search(by: [term, fulltext])
+  englishGloss: String @search(by: [fulltext])
+  englishLine: String @search(by: [fulltext])
+  verse: Verse
+  verseContent: VerseContent
+  lemma: Lemmas
+  rawJson: String
+}
+
+type AlignmentGraphEdge {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  edgeType: String @search(by: [term])
+  strongsId: String @search(by: [term])
+  lemmaText: String @search(by: [term, fulltext])
+  englishGloss: String @search(by: [fulltext])
+  verse: Verse
+  lemma: Lemmas
+  rawJson: String
+}
+
+type EntityRelationCandidate {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  status: String @search(by: [term])
+  reason: String @search(by: [term, fulltext])
+  relationType: String @search(by: [term])
+  sourceVerse: Verse
+  entityA: Entities
+  entityB: Entities
+  rawJson: String
+}
+
+type SynonymSet {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  sourceLang: String @search(by: [term])
+  synsetKey: String @search(by: [term])
+  label: String @search(by: [term, fulltext])
+  gloss: String @search(by: [fulltext])
+  rawJson: String
+}
+
+type SynonymEdge {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  sourceType: String @search(by: [term])
+  sourceLang: String @search(by: [term])
+  sourceStrongsId: String @search(by: [term])
+  targetStrongsId: String @search(by: [term])
+  sourceLemmaText: String @search(by: [term, fulltext])
+  targetLemmaText: String @search(by: [term, fulltext])
+  sourceSynsetKey: String @search(by: [term])
+  targetSynsetKey: String @search(by: [term])
+  score: Float
+  sourceLemma: Lemmas
+  targetLemma: Lemmas
+  sourceSynset: Synset
+  targetSynset: Synset
+  rawJson: String
+}
+
+type SynsetEmbedding {
+  id: ID!
+  modelName: String @search(by: [term])
+  label: String @search(by: [term, fulltext])
+  gloss: String @search(by: [fulltext])
+  embedding: [Float] @vector
+  synset: Synset
+  rawJson: String
+}
+
+type AuxiliaryVector {
+  id: ID!
+  sourceFile: String @search(by: [term])
+  vectorKey: String @search(by: [term])
+  languageCode: String @search(by: [term])
+  lemmaText: String @search(by: [term, fulltext])
+  modelName: String @search(by: [term])
+  embedding: [Float] @vector
+  rawJson: String
+}
+
+type Summaries {
+  id: ID!
+  summaryText: String @search(by: [fulltext])
+  level: Int
+  book: Book
+  chapter: Chapter
+}
+
+type SyntaxRelations {
+  id: ID!
+  subjectText: String @search(by: [term])
+  verbText: String @search(by: [term])
+  objectText: String @search(by: [term])
+  relationType: String @search(by: [term])
+  verse: Verse
+  subjectLemma: Lemmas
+  verbLemma: Lemmas
+  objectLemma: Lemmas
+}
+
+type InterlinearAlignment {
+  id: ID!
+  verse: Verse
+  wordIndex: Int
+  hebrewWord: String @search(by: [term])
+  englishGloss: String @search(by: [fulltext])
+  lemma: Lemmas
+}
+
+type Entities {
+  id: ID!
+  canonicalId: String! @unique @search(by: [term])
+  name: String! @search(by: [term, fulltext])
+  normalizedName: String @search(by: [term])
+  entityType: String @search(by: [term])
+  description: String
+  aliases: [String] @search(by: [term])
+  mentions: [EntityMentions] @hasInverse(field: "entity")
+  edgesA: [EntityEdges] @hasInverse(field: "entityA")
+  edgesB: [EntityEdges] @hasInverse(field: "entityB")
+}
+
+type EntityMentions {
+  id: ID!
+  mentionKey: String! @unique @search(by: [term])
+  tokenStart: Int
+  tokenEnd: Int
+  confidence: Float
+  entity: Entities
+  verse: Verse
+}
+
+type EntityEdges {
+  id: ID!
+  relationType: String
+  weight: Float
+  sourceVerse: Verse
+  entityA: Entities
+  entityB: Entities
+}
+
+type UnifiedBible {
+  id: ID!
+  verseNumber: Int
+  chapter: Int
+  text: String @search(by: [fulltext])
+  gospel: String
+  sourceVerse: String
+  notes: String
+  chapterHeading: String
+  sectionHeading: String
+  metadata: String
+}
+
+type Note {
+  id: ID!
+  title: String! @search(by: [term, fulltext])
+  content: String! @search(by: [fulltext])
+  urls: [String] @search(by: [term])
+  images: [String] @search(by: [term])
+  tags: [String] @search(by: [term])
+  category: NoteCategory
+  noteVerses: [NoteVerse] @hasInverse(field: "note")
+  noteVideos: [NoteVideo] @hasInverse(field: "note")
+  summary: String @search(by: [fulltext])
+  embedding: [Float] @vector
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type NoteCategory {
+  id: ID!
+  name: String! @unique @search(by: [term, fulltext])
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  parent: NoteCategory
+  children: [NoteCategory] @hasInverse(field: "parent")
+  notes: [Note] @hasInverse(field: "category")
+}
+
+type NoteVerse {
+  id: ID!
+  gospel: String! @search(by: [term])
+  reference: String! @search(by: [term])
+  fullRef: String! @search(by: [term, fulltext])
+  note: Note
+}
+
+type NoteRelationship {
+  id: ID!
+  fromNote: Note
+  toNote: Note
+  relationshipType: String! @search(by: [term])
+}
+
+type NoteVideo {
+  id: ID!
+  url: String! @search(by: [term])
+  videoId: String! @search(by: [term])
+  scriptContent: String
+  note: Note
+}
+
+# Video Schema
+enum VideoStatus {
+  NEW
+  IN_PROGRESS
+  COMPLETED
+  SCHEDULED
+  PUBLISHED
+  DELETED
+}
+
+type Video {
+  id: ID!
+  name: String! @search(by: [term, fulltext])
+  status: VideoStatus
+  createdAt: DateTime
+  updatedAt: DateTime
+  script: String
+  generatedFilename: String
+  generatedTitle: String
+  generatedDescription: String
+  generatedTags: String
+  thumbnailPromptA: String
+  thumbnailPromptB: String
+  checklist: String # JSON
+  views: [VideoView] @hasInverse(field: "video")
+  keywords: [VideoKeyword] @hasInverse(field: "video")
+}
+
+type VideoView {
+  id: ID!
+  date: DateTime
+  count: Int
+  video: Video
+}
+
+type Keyword {
+  id: ID!
+  text: String! @unique @search(by: [term])
+  videos: [VideoKeyword] @hasInverse(field: "keyword")
+}
+
+type VideoKeyword {
+  video: Video
+  keyword: Keyword
+}
+
+enum BookCorpus {
+  CANONICAL
+  GNOSTIC
+}

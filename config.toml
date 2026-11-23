@@ -1,0 +1,52 @@
+[badges]
+dock = "./assets/dock.png"
+taskbar = "./assets/tray.png"
+
+[server]
+port = 8000
+storage_path = "./db_data"
+embedding = true
+
+[zenoh]
+# Mode: "peer" (default, forms mesh) or "client" (requires connect)
+mode = "peer"
+# Connect: Empty for the root/seed node
+connect = [] 
+# Listen: Explicitly bind 7447 (Default Zenoh port)
+listen = ["tcp/0.0.0.0:7448"] # Changed port to avoid conflict if VardaDB is also running
+prefix = "archon/ops"
+
+# [remote_append]
+# path = "replication_log.jsonl"
+
+[llm]
+provider = "mlx"
+port = 8080
+
+[brain]
+context_window_size = 8
+#planning = "/Volumes/Data/Users/paul/.cache/huggingface/hub/models--mlx-community--Llama-3.2-1B-Instruct-4bit/snapshots/08231374eeacb049a0eade7922910865b8fce912"
+#thinking = "/Volumes/Data/Users/paul/.cache/huggingface/hub/models--mlx-community--Meta-Llama-3-8B-Instruct/snapshots/d9e88ded22c2c7fb6bdd246436b88f6ffbfe445a"
+#thinking = "/Volumes/Data/Users/paul/.cache/huggingface/hub/models--mlx-community--Qwen3.5-2B-MLX-4bit/snapshots/93760be4f1f69842a46bc13dbdc0f19e291392a3"
+#thinking = "/Volumes/Data/Users/paul/.cache/huggingface/hub/models--mlx-community--Qwen3.5-9B-MLX-4bit/snapshots/d0b3cb793b1b12acf826571ae1bb2bc819a7a37f"
+
+#planning = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
+thinking = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
+
+[planner]
+max_estimated_cost = 50000000000000000
+max_actual_cost = 10000000000000000
+
+[vault]
+db = "archondb"
+llm_model = "mlx-community/LFM2-8B-A1B-4bit"
+path = "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus"
+attachment_root = "/Volumes/Data/Users/paul/Desktop/obsidian"
+exclude_folders = [
+    "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus/_todo",
+    "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus/business",
+    "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus/Scifi Novel",
+    "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus/Videos to watch",
+    "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus/Youtube Channel Tips",
+    "/Volumes/Data/Users/paul/Desktop/obsidian/Faith in Jesus/Youtube videos to make/Short form - PaulStarrHimself",
+]
