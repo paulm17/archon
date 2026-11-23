@@ -1,0 +1,26 @@
+[package]
+name = "pia_proxy"
+version = "0.2.0"
+edition = "2021"
+description = "Per-region Private Internet Access proxy: userspace WireGuard tunnels with a round-robin SOCKS5/HTTP front end"
+
+[lib]
+name = "pia_proxy"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io", "rt"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+boringtun = { version = "0.7", default-features = false }
+smoltcp = { version = "0.11", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "socket-tcp", "socket-udp"] }
+base64 = "0.22"
+rand = "0.8"
+socket2 = "0.5"

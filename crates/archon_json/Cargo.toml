@@ -1,0 +1,14 @@
+[package]
+name = "archon_json"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+regex = "1"
+walkdir = "2"
+anyhow = "1.0"
+scraper = "0.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+archon_pipeline = { path = "../archon_pipeline" }

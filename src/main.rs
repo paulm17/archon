@@ -7,7 +7,11 @@ use rust_embed::RustEmbed;
 use tracing::info;
 
 #[derive(Parser)]
-#[command(name = "archon")]
+#[command(
+    name = "archon",
+    about = "Archon desktop app and command-line tools",
+    after_help = "Examples:\n  cargo run --\n  cargo run -- --dev\n  cargo run -- scrape --dry-run --translation T4T --book GEN --chapter 1\n  cargo run -- scrape --translation T4T --book GEN --chapter 1\n  cargo run -- json --translation T4T\n  cargo run -- db --help\n  cargo run -- scrape --help\n  cargo run -- json --help"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -19,6 +23,33 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Fetch chapters into output/gospels (live fetching requires Chromium and PIA_USER / PIA_PASS)
+    Scrape {
+        /// Preview URLs and output paths offline
+        #[arg(long)]
+        dry_run: bool,
+        /// Configured target name or zero-based index
+        #[arg(long)]
+        target: Option<String>,
+        /// Translation codes, comma-separated
+        #[arg(long, value_delimiter = ',')]
+        translation: Vec<String>,
+        /// USFM book IDs, comma-separated
+        #[arg(long, value_delimiter = ',')]
+        book: Vec<String>,
+        /// Chapter numbers, comma-separated
+        #[arg(long, value_delimiter = ',', value_parser = clap::value_parser!(u32).range(1..))]
+        chapter: Vec<u32>,
+        /// Language code
+        #[arg(long)]
+        lang: Option<String>,
+    },
+    /// Convert saved HTML from output/gospels into chapter JSON under output/json
+    Json {
+        /// Translation codes, comma-separated (default: all available)
+        #[arg(long, value_delimiter = ',')]
+        translation: Vec<String>,
+    },
     /// Database Management
     #[command(subcommand)]
     Db(vardadb::cli::DbCommands),
@@ -27,6 +58,66 @@ enum Commands {
 #[derive(RustEmbed)]
 #[folder = "frontend/dist"] // Point this to your built UI assets
 struct Assets;
+
+fn run_command(command: Commands) -> anyhow::Result<()> {
+    let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("output");
+    match command {
+        Commands::Db(command) => {
+            let config = startup::load_varda_config("config.toml")
+                .map_err(|e| anyhow::anyhow!("Failed to load config.toml: {e}"))?;
+            vardadb::cli::handle_db_command_direct(&command, &config)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+        }
+        Commands::Scrape {
+            dry_run,
+            target,
+            translation,
+            book,
+            chapter,
+            lang,
+        } => {
+            let filters = archon_scraper::Narrow {
+                translations: translation,
+                books: book,
+                chapters: chapter,
+                language: lang,
+            };
+            if dry_run {
+                print!(
+                    "{}",
+                    archon_scraper::preview(&output, target.as_deref(), &filters)?
+                );
+            } else {
+                let report = tokio::runtime::Runtime::new()?.block_on(archon_scraper::run(
+                    &output,
+                    target.as_deref(),
+                    &filters,
+                ))?;
+                println!("{}", report.summary());
+                for failure in &report.failed {
+                    eprintln!("{}: {}", failure.url, failure.error);
+                }
+                anyhow::ensure!(
+                    report.failed.is_empty(),
+                    "{} chapter(s) failed",
+                    report.failed.len()
+                );
+            }
+        }
+        Commands::Json { translation } => {
+            let selection: Vec<_> = translation.iter().map(String::as_str).collect();
+            let outcome = archon_json::run(&output, &selection)?;
+            outcome.print_failures();
+            println!("{}", outcome.summary("json"));
+            anyhow::ensure!(
+                outcome.failed.is_empty(),
+                "{} chapter(s) failed",
+                outcome.failed.len()
+            );
+        }
+    }
+    Ok(())
+}
 
 fn main() {
     // 1. Initialize Logging (Basic)
@@ -62,23 +153,9 @@ fn main() {
 
     // If it's a CLI command, execute and exit
     if let Some(cmd) = cli.command {
-        let config_path = "config.toml";
-        // Load config for CLI (using VardaConfig directly as CLI expects it)
-        let config = match startup::load_varda_config(config_path) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Failed to load config from {}: {}", config_path, e);
-                std::process::exit(1);
-            }
-        };
-
-        match cmd {
-            Commands::Db(db_cmd) => {
-                if let Err(e) = vardadb::cli::handle_db_command_direct(&db_cmd, &config) {
-                    eprintln!("Command failed: {}", e);
-                    std::process::exit(1);
-                }
-            }
+        if let Err(error) = run_command(cmd) {
+            eprintln!("Command failed: {error:#}");
+            std::process::exit(1);
         }
         return;
     }

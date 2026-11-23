@@ -1,0 +1,17 @@
+[package]
+name = "archon_scraper"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+chromiumoxide = "0.7"
+futures = "0.3"
+libc = "0.2"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+archon_pipeline = { path = "../archon_pipeline" }
+pia_proxy = { path = "../pia_proxy" }

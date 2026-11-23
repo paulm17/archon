@@ -1,0 +1,192 @@
+# ============================================================================
+# config.toml — what to do on this run
+#
+# Domain data (sites, languages, books, translations) lives in catalog.toml.
+# This file only says which of it to act on, and how.
+# ============================================================================
+
+[catalog]
+# Omit to use the catalog compiled into the binary; set to override for
+# experiments without a rebuild.
+# path = "catalog.toml"
+
+# ----------------------------------------------------------------------------
+# Output roots. Everything below them is derived from the catalog:
+#   <gospels>/<language>/<translation>/<book>/chapter_<n>.html
+# ----------------------------------------------------------------------------
+[output]
+gospels = "gospels"
+json    = "json"
+books   = "books"     # reserved book catalog directory
+report  = "reports"   # run summaries and failure lists
+
+# ----------------------------------------------------------------------------
+# Browser
+# ----------------------------------------------------------------------------
+[browser]
+headless = false
+window_width = 1920
+window_height = 1080
+user_data_dir = "chrome/data"
+extensions_dir = ""     # set to a dir containing ublock_origin_lite if desired
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+]
+
+# ----------------------------------------------------------------------------
+# Proxy — the local rotator. Fails fast if enabled and unreachable.
+# ----------------------------------------------------------------------------
+[proxy]
+enabled = true
+type = "http"
+
+[[proxy.endpoints]]
+host = "localhost"
+port = 8889
+region = "Proxy Multiplier"
+
+# ----------------------------------------------------------------------------
+# Retry — exponential backoff with jitter, per chapter
+# ----------------------------------------------------------------------------
+[retry]
+max_attempts = 10
+initial_delay_ms = 1000
+max_delay_ms = 32000
+backoff_multiplier = 2.0
+jitter_factor = 0.1
+
+# ----------------------------------------------------------------------------
+# Timing
+#   page_load    settle time after navigation
+#   navigation   hard deadline for content to reach a stable verse count
+#   element_click poll interval while waiting
+# ----------------------------------------------------------------------------
+[timing]
+page_load = 2000
+navigation = 30000
+element_click = 500
+
+# ----------------------------------------------------------------------------
+# TARGETS — what to scrape. Each target selects catalog entries.
+#
+#   site          required
+#   languages     optional; omit for every language the site serves
+#   translations  optional; omit for every translation in the language
+#   books         optional; usfm ids, or "ot" / "nt" / "dc" / "all"
+#   chapters      optional; omit for the whole book
+#
+# A target is a filter, not a copy: `scraper scrape --target 0` runs one,
+# `--dry-run` prints the resulting URL and path matrix before any browser
+# starts.
+# ----------------------------------------------------------------------------
+
+[[targets]]
+name = "biblecom-gospels"
+site = "bible_com"
+books = ["MAT", "MRK", "LUK", "JHN"]
+
+[[targets]]
+name = "korean-german"
+site = "ibep"
+books = ["MAT", "MRK", "LUK", "JHN"]
+
+[[targets]]
+name = "gateway-greek"
+site = "bible_gateway"
+languages = ["gr"]
+translations = ["SBLGNT"]
+books = ["MAT", "MRK", "LUK", "JHN"]
+
+[[targets]]
+name = "gateway-hebrew"
+site = "bible_gateway"
+languages = ["he"]
+books = ["GEN"]
+chapters = [1, 2]
+
+[[targets]]
+name = "studybible-gospels"
+site = "study_bible"
+books = ["MAT", "MRK", "LUK", "JHN"]
+
+[[targets]]
+name = "studybible-nheb"
+site = "study_bible"
+translations = ["NHEB"]
+
+[[targets]]
+name = "interlinear"
+site = "bible_hub"
+books = ["GEN"]
+chapters = [1]
+
+[[targets]]
+name = "oeb"
+site = "oeb"
+books = ["MAT", "MRK"]
+
+# Narrow test targets: one chapter each, matching a chapter already saved by
+# one of the old per-site scrapers, so a live fetch can be diffed against it.
+[[targets]]
+name = "gateway-niv"
+site = "bible_gateway"
+translations = ["NIV"]
+books = ["GEN"]
+chapters = [1]
+
+[[targets]]
+name = "studybible-2sam"
+site = "study_bible"
+translations = ["BSB"]
+books = ["2SA"]
+chapters = [11]
+
+[[targets]]
+name = "oeb-luke"
+site = "oeb"
+books = ["LUK"]
+chapters = [1]
+
+# Open Bible Data: seven English versions, one page per chapter.
+[[targets]]
+name = "obd-en"
+site = "obd"
+
+[[targets]]
+name = "obd-fbv"
+site = "obd"
+translations = ["FBV"]
+books = ["GEN"]
+chapters = [1]
+
+# ----------------------------------------------------------------------------
+# Workflow options
+# ----------------------------------------------------------------------------
+[scrape]
+skip_existing = true     # skip chapters already saved and valid
+verify_after_save = true # re-validate the saved file before marking it done
+write_manifest = true    # per-book manifest.json: url, site, time, verses, hash
+
+[json]
+skip_existing = true
+pretty = true
+
+# ----------------------------------------------------------------------------
+# PIA proxy (the `pia_proxy` library in crates/pia_proxy)
+# ----------------------------------------------------------------------------
+# The library opens one userspace WireGuard tunnel per configured region and
+# serves a single round-robin SOCKS5 + HTTP CONNECT listener on 8889 — the only
+# endpoint this app knows about. `scrape` starts it in-process before launching
+# Chromium when `enabled = true`.
+#
+# Regions live in the proxy crate's own config.toml. The PIA account login is
+# read from the environment (PIA_USER / PIA_PASS).
+[proxy_pool]
+enabled = true
+config = "../pia_proxy/config.toml"
+# regions = 4      # optional cap on how many regions to provision
+
+# ----------------------------------------------------------------------------

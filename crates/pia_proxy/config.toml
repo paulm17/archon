@@ -1,0 +1,111 @@
+# pia-proxy configuration
+#
+# Credentials are not stored here: the proxy reads PIA_USER / PIA_PASS from the
+# environment, which the app loads from the project's .env file.
+#
+# This file holds only the listener, rotation and region settings.
+
+[listen]
+host = "127.0.0.1"
+port = 8889
+
+[rotation]
+max_attempts = 3          # upstreams tried per client connection
+cooldown_secs = 60        # a retired region is out of rotation this long, then probed again
+connect_timeout_secs = 12 # whole budget for one client connection, shared between its attempts;
+                          # keep it well under [timing].navigation in the app's config.toml
+
+# Regions are PIA ids from serverlist.piaservers.net/vpninfo/servers/v6.
+# Any region with WireGuard servers works. `port` pins a region to its own
+# local port, gluetun style, in addition to the round-robin listener.
+[[regions]]
+name = "CA Montreal"
+id = "ca"
+port = 9000
+
+[[regions]]
+name = "CA Ontario"
+id = "ca_ontario"
+port = 9001
+
+[[regions]]
+name = "CA Toronto"
+id = "ca_toronto"
+port = 9002
+
+[[regions]]
+name = "US Atlanta"
+id = "us_atlanta"
+port = 9003
+
+[[regions]]
+name = "US California"
+id = "us_california"
+port = 9004
+
+[[regions]]
+name = "US Chicago"
+id = "us_chicago"
+port = 9005
+
+[[regions]]
+name = "US Denver"
+id = "us_denver"
+port = 9006
+
+[[regions]]
+name = "US East"
+id = "us-newjersey"
+port = 9007
+
+[[regions]]
+name = "US Florida"
+id = "us_florida"
+port = 9008
+
+[[regions]]
+name = "US Houston"
+id = "us_houston"
+port = 9009
+
+[[regions]]
+name = "US Las Vegas"
+id = "us_las_vegas"
+port = 9010
+
+[[regions]]
+name = "US New York"
+id = "us_new_york_city"
+port = 9011
+
+[[regions]]
+name = "US Seattle"
+id = "us_seattle"
+port = 9012
+
+[[regions]]
+name = "US Silicon Valley"
+id = "us_silicon_valley"
+port = 9013
+
+[[regions]]
+name = "US Texas"
+id = "us_south_west"
+port = 9014
+
+[[regions]]
+name = "US Washington DC"
+id = "us_washington_dc"
+port = 9015
+
+[[regions]]
+name = "US West"
+id = "us3"
+port = 9016
+
+# Optional extra upstream: PIA's SOCKS5 proxy (Netherlands only).
+# Uses the generated "x..." proxy login, not your account login.
+# [socks5]
+# endpoint = "proxy-nl.privateinternetaccess.com:1080"
+# username = "x0000000"
+# password = "REPLACE_ME"

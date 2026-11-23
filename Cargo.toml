@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2024"
 default-run = "archon"
 
+[workspace]
+members = ["crates/*"]
+
 [dependencies]
+archon_scraper = { path = "crates/archon_scraper" }
+archon_json = { path = "crates/archon_json" }
 rust-cef = { path = "../rust-cef" }
 vardadb = { path = "../VardaDB" }
 tokio = { version = "1", features = ["full"] }
