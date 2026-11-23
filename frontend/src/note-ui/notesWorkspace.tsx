@@ -15,7 +15,7 @@ import {
 import { IconAlertCircle, IconChevronDown, IconChevronRight, IconFileText, IconFolders, IconFolderFilled, IconX } from '@tabler/icons-react';
 import { Tree, type NodeApi, type NodeRendererProps, type TreeApi } from 'react-arborist';
 import { pipe, subscribe } from 'wonka';
-import { client } from '../lib/client';
+import { scriptureClient } from '../lib/client';
 import { type NoteCategory, type RelatedNoteRecord, type NotesTreeData, listNotesTree } from './api';
 import { NoteViewContent } from './noteViewContent';
 
@@ -270,7 +270,7 @@ export function NotesWorkspace({ height = 'calc(100vh - 220px)' }: NotesWorkspac
 
   useEffect(() => {
     const subscription = pipe(
-      client.subscription(
+      scriptureClient.subscription(
         `
           subscription NotesWorkspaceEvents($types: [String]) {
             event(types: $types) {

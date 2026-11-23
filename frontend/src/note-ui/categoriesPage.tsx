@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ActionIcon, Alert, Button, Group, Paper, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconAlertCircle, IconEdit, IconFolderCog, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
-import { client } from '../lib/client';
+import { scriptureClient } from '../lib/client';
 import { pipe, subscribe } from 'wonka';
 import { countChildCategories, countNotesForCategory, deleteCategory, listCategories, type NoteCategory } from './api';
 import { buildCategoryPathMap } from './categoryTree';
@@ -34,7 +34,7 @@ export function CategoriesPage() {
 
   useEffect(() => {
     const subscription = pipe(
-      client.subscription(
+      scriptureClient.subscription(
         `
           subscription CategoryEvents($types: [String]) {
             event(types: $types) {

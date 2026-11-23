@@ -1,4 +1,4 @@
-import { client } from '../lib/client';
+import { scriptureClient } from '../lib/client';
 
 const GRAPHQL_URL = 'http://localhost:8000/graphql';
 const VARDA_BASE_URL = GRAPHQL_URL.replace(/\/graphql$/, '');
@@ -200,7 +200,7 @@ function optionalArgs(args: string | null) {
 }
 
 async function runQuery<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-  const result = await client.query(query, variables, { requestPolicy: 'network-only' }).toPromise();
+  const result = await scriptureClient.query(query, variables, { requestPolicy: 'network-only' }).toPromise();
   if (result.error) {
     throw new Error(result.error.message);
   }
@@ -208,7 +208,7 @@ async function runQuery<T>(query: string, variables: Record<string, unknown> = {
 }
 
 async function runMutation<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-  const result = await client.mutation(query, variables).toPromise();
+  const result = await scriptureClient.mutation(query, variables).toPromise();
   if (result.error) {
     throw new Error(result.error.message);
   }
@@ -786,7 +786,7 @@ export async function fetchVerses(
     }
   `;
 
-  const result = await client.query(query, { gospel, chapter, start, end }).toPromise();
+  const result = await scriptureClient.query(query, { gospel, chapter, start, end }).toPromise();
   if (result.error) {
     throw new Error(result.error.message);
   }

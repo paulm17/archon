@@ -1,4 +1,4 @@
-import { client } from '../lib/client';
+import { scriptureClient } from '../lib/client';
 import type {
     BooksGroup,
     CategoryGroup,
@@ -9,7 +9,7 @@ import type {
 } from './types';
 
 // Use shared client from lib
-export { client };
+export { scriptureClient as client };
 
 function safeParseJson(input: string): any {
     try {
@@ -58,7 +58,7 @@ export async function getBooksGrouped(translationCode: string): Promise<BooksGro
             }
         `;
 
-        const result = await client.query(query, { code: translationCode }).toPromise();
+        const result = await scriptureClient.query(query, { code: translationCode }).toPromise();
 
         if (result.error) {
             console.error("GraphQL Error:", result.error);
@@ -170,7 +170,7 @@ export async function getTranslations(gospel: GospelSelection = 'canonical'): Pr
         }
       `;
 
-      const result = await client.query(query, {}).toPromise();
+      const result = await scriptureClient.query(query, {}).toPromise();
       if (result.error) {
         console.error('Thomas translations error:', result.error);
       }
@@ -215,7 +215,7 @@ export async function getTranslations(gospel: GospelSelection = 'canonical'): Pr
       }
     `;
 
-    const result = await client.query(query, {}).toPromise();
+    const result = await scriptureClient.query(query, {}).toPromise();
     if (result.error) {
       console.error('Canonical translations error:', result.error);
     }
@@ -280,7 +280,7 @@ export async function getPassage(
         `;
 
         try {
-            const hierarchyResult = await client.query(hierarchyQuery, { translationCode: version }).toPromise();
+            const hierarchyResult = await scriptureClient.query(hierarchyQuery, { translationCode: version }).toPromise();
 
             if (hierarchyResult.error) {
                 console.error('GraphQL Error (Thomas hierarchy):', hierarchyResult.error);
@@ -334,7 +334,7 @@ export async function getPassage(
                 }
             `;
 
-            const contentResult = await client.query(contentQuery, {}).toPromise();
+            const contentResult = await scriptureClient.query(contentQuery, {}).toPromise();
             if (contentResult.error) {
                 console.error("GraphQL Error (Thomas content):", contentResult.error);
                 return [];
@@ -445,7 +445,7 @@ export async function getPassage(
     let bookCode = bookSearchStr;
 
     try {
-        const booksResult = await client.query(booksQuery, {}).toPromise();
+        const booksResult = await scriptureClient.query(booksQuery, {}).toPromise();
         if (!booksResult.error && booksResult.data?.queryBook) {
             const books = booksResult.data.queryBook;
             const normalizedInfo = bookSearchStr.toLowerCase().trim();
@@ -490,7 +490,7 @@ export async function getPassage(
     `;
 
     try {
-        const hierarchyResult = await client.query(hierarchyQuery, { code: bookCode }).toPromise();
+        const hierarchyResult = await scriptureClient.query(hierarchyQuery, { code: bookCode }).toPromise();
         
         if (hierarchyResult.error) {
             console.error("GraphQL Error (Hierarchy):", hierarchyResult.error);
@@ -537,7 +537,7 @@ export async function getPassage(
             }
         `;
 
-        const contentResult = await client.query(contentQuery, { id: targetChapter.id }).toPromise();
+        const contentResult = await scriptureClient.query(contentQuery, { id: targetChapter.id }).toPromise();
 
         if (contentResult.error) {
              console.error("GraphQL Error (Content):", contentResult.error);
@@ -636,7 +636,7 @@ export const getVerseInAllTranslations = async (
     `;
 
   try {
-      const hierarchyResult = await client.query(hierarchyQuery, { code: bookCode }).toPromise();
+      const hierarchyResult = await scriptureClient.query(hierarchyQuery, { code: bookCode }).toPromise();
         
       if (hierarchyResult.error) {
           console.error("GraphQL Error (Hierarchy):", hierarchyResult.error);
@@ -681,7 +681,7 @@ export const getVerseInAllTranslations = async (
         }
       `;
 
-      const contentResult = await client.query(contentQuery, {}).toPromise();
+      const contentResult = await scriptureClient.query(contentQuery, {}).toPromise();
       
       if (contentResult.error) {
           console.error("GraphQL Error (Content):", contentResult.error);

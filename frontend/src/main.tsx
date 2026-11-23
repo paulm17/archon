@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { VardaProvider } from 'varda-client'
 import { MantineProvider } from '@mantine/core';
-import { client } from './lib/client'
+import { scriptureClient } from './lib/client'
 import App from './App'
 
 import './index.css'
@@ -14,7 +14,7 @@ if (!rootElement.innerHTML) {
   const root = createRoot(rootElement)
   root.render(
     <StrictMode>
-      <VardaProvider value={client}>
+      <VardaProvider value={scriptureClient}>
         <MantineProvider>
           <App />
         </MantineProvider>

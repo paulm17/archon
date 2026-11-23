@@ -1,5 +1,5 @@
 import { AppShell, Tooltip } from '@mantine/core';
-import { NavLink, Outlet, useMatch } from 'react-router-dom';
+import { Link, Outlet, useLocation, useMatch } from 'react-router-dom';
 import './WorkspaceShell.css';
 
 const destinations = [
@@ -8,20 +8,26 @@ const destinations = [
   { name: 'Ask AI', path: '/ask-ai', icon: 'M13 5H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2v4l5-4h6a2 2 0 0 0 2-2v-3 M18 2l1.4 4.1L23 8l-3.6 1.6L18 14l-1.5-4.4L13 8l3.5-1.9z M7 12h4' },
   { name: 'Translations', path: '/translation', icon: 'M3 3h12v12H3z M9 17v4h12V9h-4 M6 12l3-7 3 7m-5-2h4 M13 18l4-4m-3 0 4 4' },
   { name: 'YT Videos', path: '/yt-video', icon: 'M5 5h14q3 0 3 3v8q0 3-3 3H5q-3 0-3-3V8q0-3 3-3z M10 8.5v7l6-3.5z' },
+  { name: 'New Gospel', path: '/new_gospel', icon: 'M6 3h13v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M4 18q0-2 2-2h13 M9 3v8l2-2 2 2V3' },
+  { name: 'Chat', path: '/chat', icon: 'M21 11a8 8 0 0 1-8 8H9l-6 3 1.5-6A8 8 0 0 1 11 3h2a8 8 0 0 1 8 8z M8 10h8 M8 13h5' },
 ];
 
 export function WorkspaceShell() {
+  const { pathname } = useLocation();
+  const section = '/' + pathname.split('/')[1];
+  const activePath = section === '/thomas' || section === '/dictionary' ? '/new_gospel'
+    : section === '/settings' ? '/chat' : section;
   const isBible = useMatch("/bible");
   return (
     <AppShell padding={isBible ? 0 : "md"} navbar={{ width: { base: 56, sm: 72 }, breakpoint: 0 }}>
       <AppShell.Navbar className="workspace-rail" aria-label="Main navigation">
         {destinations.map(({ name, path, icon }) => (
           <Tooltip key={path} label={name} position="right" events={{ hover: true, focus: true, touch: false }}>
-            <NavLink to={path} aria-label={name}>
+            <Link to={path} aria-current={activePath === path ? "page" : undefined} aria-label={name}>
               <svg aria-hidden="true" width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
                 <path d={icon} />
               </svg>
-            </NavLink>
+            </Link>
           </Tooltip>
         ))}
       </AppShell.Navbar>

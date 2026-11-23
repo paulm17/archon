@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ActionIcon, Alert, Badge, Box, Button, Collapse, Group, Paper, SegmentedControl, Select, Stack, Text, TextInput, ThemeIcon, Title } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconAlertCircle, IconChevronDown, IconDatabaseOff, IconEdit, IconFilter, IconFolderCog, IconPlus, IconSearch, IconSparkles, IconTrash } from '@tabler/icons-react';
-import { client } from '../lib/client';
+import { scriptureClient } from '../lib/client';
 import { openChildWindow } from '../lib/nativeWindow';
 import { pipe, subscribe } from 'wonka';
 import { deleteNote, listCategories, listNotes, type NoteCategory, type NoteRecord } from './api';
@@ -73,7 +73,7 @@ export function NotesListPage() {
 
   useEffect(() => {
     const subscription = pipe(
-      client.subscription(
+      scriptureClient.subscription(
         `
           subscription NotesEvents($types: [String]) {
             event(types: $types) {

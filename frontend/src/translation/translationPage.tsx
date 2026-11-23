@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Container, Group, Table, TextInput, Stack, Alert } from '@mantine/core';
-import { client } from '../lib/client';
+import { scriptureClient } from '../lib/client';
 
 type TranslationResult = {
   translationName: string;
@@ -80,7 +80,7 @@ export function TranslationPage() {
 
   const getVerseInAllTranslations = async (search: string): Promise<TranslationResult[]> => {
       // 1. Fetch all books for name matching
-      const result = await client.query(`
+      const result = await scriptureClient.query(`
         query GetBooksForTranslationLookup {
           queryBook {
             id
@@ -115,7 +115,7 @@ export function TranslationPage() {
       console.log(`Searching for ${bookCode} ${chapter}:${verse} in all translations`);
     
       // 3. Fetch verses from all translations
-      const result2 = await client.query(`
+      const result2 = await scriptureClient.query(`
         query GetVerseInAllTranslations($bookCode: String!, $chapter: Int!, $verse: Int!) {
           queryVerse(filter: {
             chunkType: { eq: "single_verse" }

@@ -1,0 +1,15 @@
+
+type ChatThread {
+  id: ID!
+  title: String
+  createdAt: DateTime! @search(by: [hour])
+  messages: [ChatMessage] @hasInverse(field: "thread")
+}
+
+type ChatMessage {
+  id: ID!
+  thread: ChatThread!
+  role: String! @search(by: [term])
+  content: String! @search(by: [fulltext])
+  createdAt: DateTime! @search(by: [hour])
+}

@@ -1,0 +1,257 @@
+type Logion {
+  id: ID!
+  number: String! @unique @search(by: [term])
+  copticText: String @search(by: [fulltext])
+  notes: String @search(by: [fulltext])
+  tokens: [Token] @hasInverse(field: "logion")
+  translations: [Translation] @hasInverse(field: "logion")
+  criteria: [Criterion] @hasInverse(field: "logion")
+  scores: [LogionScore] @hasInverse(field: "logion")
+  lexemeUsageExamples: [LexemeUsageExample] @hasInverse(field: "logion")
+  translationAlignments: [TranslationAlignment] @hasInverse(field: "logion")
+  lexicalSourceGroups: [LexicalSourceGroup] @hasInverse(field: "logion")
+  lexicalEvidence: [LexicalEvidence] @hasInverse(field: "logion")
+}
+
+type Token {
+  id: ID!
+  logion: Logion
+  lexeme: Lexeme @hasInverse(field: "tokens")
+  tokenIndex: Int! @search(by: [int])
+  coptic: String @search(by: [term, fulltext])
+  greek: String @search(by: [term, fulltext])
+  transliteration: String @search(by: [term])
+  englishGloss: String @search(by: [fulltext])
+  source: String @search(by: [term])
+  morphology: TokenMorphology @hasInverse(field: "token")
+  lexicon: TokenLexicon @hasInverse(field: "token")
+  phraseLinks: [TokenPhraseLink] @hasInverse(field: "fromToken")
+  usageExamples: [TokenUsageExample] @hasInverse(field: "token")
+  lexemeUsageExamples: [LexemeUsageExample] @hasInverse(field: "token")
+  translationAlignments: [TranslationAlignment] @hasInverse(field: "token")
+}
+
+type Lexeme {
+  id: ID!
+  headword: String! @search(by: [term, fulltext])
+  normalizedHeadword: String @search(by: [term])
+  transliteration: String @search(by: [term])
+  partOfSpeech: String @search(by: [term])
+  root: String @search(by: [term])
+  definitions: [LexemeDefinition] @hasInverse(field: "lexeme")
+  forms: [LexemeForm] @hasInverse(field: "lexeme")
+  translationEquivalents: [LexemeTranslationEquivalent] @hasInverse(field: "lexeme")
+  usageExamples: [LexemeUsageExample] @hasInverse(field: "lexeme")
+  tokens: [Token] @hasInverse(field: "lexeme")
+  sourceGroups: [LexicalSourceGroup] @hasInverse(field: "lexemes")
+}
+
+type LexemeDefinition {
+  id: ID!
+  lexeme: Lexeme
+  source: String! @search(by: [term, fulltext])
+  dictionaryId: String @search(by: [term])
+  dictionaryHeadword: String @search(by: [term, fulltext])
+  definition: String @search(by: [fulltext])
+  senses: [String] @search(by: [term, fulltext])
+  outline: [String] @search(by: [term, fulltext])
+}
+
+type LexicalSourceGroup {
+  id: ID!
+  logion: Logion
+  tokens: [Token]
+  tokenIndexes: [Int] @search(by: [int])
+  coptic: String @search(by: [term, fulltext])
+  interlinearGloss: String @search(by: [fulltext])
+  groupType: String @search(by: [term])
+  lexemes: [Lexeme] @hasInverse(field: "sourceGroups")
+  renderings: [LexicalRendering] @hasInverse(field: "sourceGroup")
+  evidence: [LexicalEvidence] @hasInverse(field: "sourceGroup")
+  translationAlignments: [TranslationAlignment] @hasInverse(field: "sourceGroup")
+}
+
+type LexicalRendering {
+  id: ID!
+  sourceGroup: LexicalSourceGroup
+  english: String! @search(by: [term, fulltext])
+  normalizedEnglish: String @search(by: [term])
+  source: String! @search(by: [term])
+  relation: String @search(by: [term])
+  confidence: Float @search
+  translationAlignments: [TranslationAlignment] @hasInverse(field: "rendering")
+}
+
+type LexicalEvidence {
+  id: ID!
+  sourceGroup: LexicalSourceGroup
+  logion: Logion
+  translator: Translator
+  targetSpan: String @search(by: [fulltext])
+  method: String @search(by: [term])
+  confidence: Float @search
+}
+
+type LexemeForm {
+  id: ID!
+  lexeme: Lexeme
+  form: String! @search(by: [term, fulltext])
+  transliteration: String @search(by: [term])
+  morphology: String @search(by: [term, fulltext])
+  count: Int @search(by: [int])
+}
+
+type LexemeTranslationEquivalent {
+  id: ID!
+  lexeme: Lexeme
+  english: String! @search(by: [term, fulltext])
+  source: String! @search(by: [term])
+  relation: String @search(by: [term])
+  count: Int @search(by: [int])
+}
+
+type LexemeUsageExample {
+  id: ID!
+  lexeme: Lexeme
+  logion: Logion
+  token: Token
+  coptic: String @search(by: [term, fulltext])
+  interlinearGloss: String @search(by: [fulltext])
+  translatorName: String @search(by: [term, fulltext])
+  translatorRendering: String @search(by: [term, fulltext])
+}
+
+type TokenMorphology {
+  id: ID!
+  token: Token
+  lang: String! @search(by: [term])
+  root: String @search(by: [term])
+  literal: String @search(by: [term, fulltext])
+  grammaticalFn: String @search(by: [term, fulltext])
+  morphologyClass: String @search(by: [term])
+  morphologyText: String @search(by: [term, fulltext])
+  partOfSpeech: String @search(by: [term])
+  person: String @search(by: [term])
+  number: String @search(by: [term])
+  gender: String @search(by: [term])
+  tense: String @search(by: [term])
+  mood: String @search(by: [term])
+  voice: String @search(by: [term])
+  caseVal: String @search(by: [term])
+}
+
+type TokenLexicon {
+  id: ID!
+  token: Token
+  lookupForms: [String] @search(by: [term])
+  warnings: [String] @search(by: [term, fulltext])
+  dictionaryMatches: [DictionaryMatch] @hasInverse(field: "tokenLexicon")
+  translationRange: TranslationRange @hasInverse(field: "tokenLexicon")
+}
+
+type DictionaryMatch {
+  id: ID!
+  tokenLexicon: TokenLexicon
+  headword: String @search(by: [term, fulltext])
+  partOfSpeech: String @search(by: [term])
+  senses: [String] @search(by: [term, fulltext])
+  frequency: Int @search(by: [int])
+  source: String @search(by: [term, fulltext])
+}
+
+type TranslationRange {
+  id: ID!
+  tokenLexicon: TokenLexicon
+  literal: [String] @search(by: [term, fulltext])
+  acceptable: [String] @search(by: [term, fulltext])
+  notThisUnit: [String] @search(by: [term, fulltext])
+}
+
+type TokenPhraseLink {
+  id: ID!
+  fromToken: Token
+  targetTokenIndex: Int! @search(by: [int])
+  relationship: String @search(by: [term, fulltext])
+  combinedGloss: String @search(by: [term, fulltext])
+}
+
+type TokenUsageExample {
+  id: ID!
+  token: Token
+  logionNumber: Int! @search(by: [int])
+  tokenIndex: Int! @search(by: [int])
+  coptic: String @search(by: [term, fulltext])
+  englishGloss: String @search(by: [term, fulltext])
+  morphologyText: String @search(by: [term, fulltext])
+  notes: String @search(by: [term, fulltext])
+}
+
+type Translator {
+  id: ID!
+  name: String! @search(by: [term, fulltext])
+  shortName: String! @unique @search(by: [term])
+  tradition: String @search(by: [term])
+  translations: [Translation] @hasInverse(field: "translator")
+  scores: [Score] @hasInverse(field: "translator")
+  logionScores: [LogionScore] @hasInverse(field: "translator")
+  translationAlignments: [TranslationAlignment] @hasInverse(field: "translator")
+  lexicalEvidence: [LexicalEvidence] @hasInverse(field: "translator")
+}
+
+type Translation {
+  id: ID!
+  logion: Logion
+  translator: Translator
+  text: String! @search(by: [fulltext])
+  sourceLang: String @search(by: [term])
+}
+
+type Criterion {
+  id: ID!
+  logion: Logion
+  copticToken: String @search(by: [term])
+  englishToken: String @search(by: [term])
+  greekToken: String @search(by: [term])
+  description: String! @search(by: [fulltext])
+  weight: Int @search(by: [int])
+  failureMode: String @search(by: [term])
+  scores: [Score] @hasInverse(field: "criterion")
+}
+
+type Score {
+  id: ID!
+  criterion: Criterion
+  translator: Translator
+  logionScore: LogionScore
+  alignment: TranslationAlignment @hasInverse(field: "score")
+  rating: String! @search(by: [term])
+  note: String @search(by: [fulltext])
+  scoreVal: Float @search
+}
+
+type TranslationAlignment {
+  id: ID!
+  logion: Logion
+  token: Token
+  translator: Translator
+  score: Score
+  sourceGroup: LexicalSourceGroup @hasInverse(field: "translationAlignments")
+  rendering: LexicalRendering @hasInverse(field: "translationAlignments")
+  sourceTokenIndexes: [Int] @search(by: [int])
+  sourceGloss: String @search(by: [fulltext])
+  targetSpan: String @search(by: [fulltext])
+  confidence: Float @search
+  method: String @search(by: [term])
+  evidenceNotes: String @search(by: [fulltext])
+}
+
+type LogionScore {
+  id: ID!
+  logion: Logion!
+  translator: Translator!
+  total: Float @search
+  outOf: Int @search
+  isClosest: Boolean @search
+  footnote: String @search(by: [fulltext])
+  scores: [Score] @hasInverse(field: "logionScore")
+}

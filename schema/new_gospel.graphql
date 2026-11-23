@@ -1,0 +1,116 @@
+type SupportingReference {
+  id: ID!
+  display: String! @search(by: [term, fulltext])
+}
+
+type NewGospelVerse {
+  id: ID!
+  number: Int! @unique @search(by: [int])
+  pericope: String @search(by: [term, fulltext])
+  text: String! @search(by: [fulltext])
+  notes: String
+  assembledVerseMarks: String
+  supportingReferences: [SupportingReference]
+}
+
+type ScriptureComparisonSnapshot {
+  id: ID!
+  generatedAt: DateTime! @search(by: [hour])
+  status: String! @search(by: [term])
+  books: [String] @search(by: [term])
+  translationCodes: [String] @search(by: [term])
+  thresholdMetric: String! @search(by: [term])
+  verbatimRunFlagWords: Int
+  thresholdBufferPct: Float
+  baselineMeanPct: Float
+  thresholdPct: Float
+  totalCopyrightedVerses: Int
+  matchedLocalVerses: Int
+  unmatchedCopyrightedVerses: Int
+  parseErrorCount: Int
+  # Convergence filtering summary
+  pdTranslationCodes: [String] @search(by: [term])
+  convergenceVerseCount: Int
+  reviewVerseCount: Int
+  verses: [ScriptureComparisonVerse] @hasInverse(field: "snapshot")
+  pairSummaries: [ScriptureComparisonPairSummary] @hasInverse(field: "snapshot")
+  histogramBuckets: [ScriptureComparisonHistogramBucket] @hasInverse(field: "snapshot")
+}
+
+type ScriptureComparisonVerse {
+  id: ID!
+  snapshot: ScriptureComparisonSnapshot
+  bookCode: String! @search(by: [term])
+  bookName: String! @search(by: [term, fulltext])
+  chapter: Int! @search(by: [int])
+  verse: Int! @search(by: [int])
+  reference: String! @search(by: [term, fulltext])
+  newGospelVerseNumber: Int @search(by: [int])
+  newGospelVerseUid: String @search(by: [term])
+  supportingReferenceDisplay: String @search(by: [term, fulltext])
+  matchOrdinal: Int
+  hasLocalMatch: Boolean
+  parseError: Boolean
+  parseErrorReason: String @search(by: [term, fulltext])
+  texts: [ScriptureComparisonVerseText] @hasInverse(field: "comparisonVerse")
+  metrics: [ScriptureComparisonMetric] @hasInverse(field: "comparisonVerse")
+}
+
+type ScriptureComparisonVerseText {
+  id: ID!
+  comparisonVerse: ScriptureComparisonVerse
+  translationCode: String! @search(by: [term])
+  translationName: String! @search(by: [term, fulltext])
+  sourceKind: String! @search(by: [term])
+  text: String! @search(by: [fulltext])
+}
+
+type ScriptureComparisonMetric {
+  id: ID!
+  comparisonVerse: ScriptureComparisonVerse
+  comparisonKind: String! @search(by: [term])
+  leftTranslationCode: String! @search(by: [term])
+  rightTranslationCode: String! @search(by: [term])
+  sequenceSimilarityPct: Float
+  ngramContainmentPct: Float
+  tokenOverlapPct: Float
+  semanticSimilarityPct: Float
+  longestCommonRunWords: Int
+  longestCommonRunText: String @search(by: [fulltext])
+  baselineDeltaPct: Float
+  exceedsThreshold: Boolean
+  # Convergence filtering fields
+  pdAverageSimilarityPct: Float
+  greekGlossSimilarityPct: Float
+  convergenceDeltaPct: Float
+  glossDeltaPct: Float
+  isGreekForced: Boolean @search(by: [bool])
+  flagLevel: String @search(by: [term])
+}
+
+type ScriptureComparisonPairSummary {
+  wordRunCounts: [Int!]
+  id: ID!
+  snapshot: ScriptureComparisonSnapshot
+  comparisonKind: String! @search(by: [term])
+  leftTranslationCode: String! @search(by: [term])
+  rightTranslationCode: String! @search(by: [term])
+  averageSequenceSimilarityPct: Float
+  averageNgramContainmentPct: Float
+  averageTokenOverlapPct: Float
+  averageSemanticSimilarityPct: Float
+  averageLongestCommonRunWords: Float
+  minSequenceSimilarityPct: Float
+  maxSequenceSimilarityPct: Float
+  minNgramContainmentPct: Float
+  maxNgramContainmentPct: Float
+  verseCount: Int
+}
+
+type ScriptureComparisonHistogramBucket {
+  id: ID!
+  snapshot: ScriptureComparisonSnapshot
+  bucketStart: Int! @search(by: [int])
+  bucketEnd: Int! @search(by: [int])
+  count: Int!
+}

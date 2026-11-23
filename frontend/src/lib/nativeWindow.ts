@@ -55,9 +55,15 @@ function callRust<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
 
 export async function openChildWindow(args: CreateWindowArgs): Promise<void> {
   if (!window.cefQuery) {
+    console.log('[nativeWindow] cefQuery not available, falling back to window.open');
     window.open(args.url, '_blank');
     return;
   }
 
-  await callRust<{ status: string }>('create_window', args);
+  try {
+    await callRust<{ status: string }>('create_window', args);
+  } catch (err) {
+    console.warn('[nativeWindow] cefQuery create_window failed, falling back to window.open:', err);
+    window.open(args.url, '_blank');
+  }
 }
