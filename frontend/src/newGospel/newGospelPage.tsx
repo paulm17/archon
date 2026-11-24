@@ -250,6 +250,29 @@ const PRIORITY_TRANSLATIONS = [
   'Interlinear',
   'Open English Bible',
 ];
+const BIBLE_TRANSLATIONS = new Map([
+  ["OEB", "Open English Bible"],
+  ["ASV", "American Standard Version"],
+  ["AKJV", "Authorized (King James) Version"],
+  ["BSB", "Berean Standard Bible"],
+  ["DARBY", "Darby Translation"],
+  ["DRA", "Douay-Rheims 1899 American Edition"],
+  ["KJV", "King James Version"],
+  ["TCNT", "Twentieth Century New Testament"],
+  ["TWENTIETH_CENTURY", "Twentieth Century New Testament"], // Legacy import code
+  ["WNT", "Weymouth New Testament"],
+  ["WEB", "World English Bible"],
+  ["YLT", "Young's Literal Translation"],
+  ["T4T", "Translation for Translators"],
+  ["LSV", "Literal Standard Version"],
+  ["FBV", "Free Bible Version"],
+  ["MSB", "Majority Standard Bible"],
+  ["ULT", "unfoldingWord Literal Text"],
+  ["UST", "unfoldingWord Simplified Text"],
+  ["WMBB", "World Messianic Bible \u2014 British Edition"],
+  ["NHEB", "New Heart English Bible"],
+]);
+const BIBLE_TRANSLATION_NAMES = new Set(BIBLE_TRANSLATIONS.values());
 const EXCLUDED_TRANSLATIONS = ['NIV', 'ESV', 'NKJV', 'NLT', 'CSB', 'NRSVUE'];
 const FIRST_COLUMN_WIDTH_PX = 400;
 
@@ -1144,7 +1167,8 @@ async function buildLinkedVerseRows(
     }
 
     for (const parsedReference of parsedReferences) {
-      if (!isThomasBookCode(parsedReference.bookCode)) {
+      const isThomas = isThomasBookCode(parsedReference.bookCode);
+      if (!isThomas) {
         const interlinearVerseRows = await Promise.all(
           Array.from(
             { length: parsedReference.endVerse - parsedReference.startVerse + 1 },
@@ -1166,7 +1190,7 @@ async function buildLinkedVerseRows(
           verse.number,
         );
 
-        if (isThomasBookCode(parsedReference.bookCode) && verse.interlinearTokens.length > 0) {
+        if (isThomas && verse.interlinearTokens.length > 0) {
           interlinearRows.push({
             key: `interlinear-thomas-${reference.display}-${parsedReference.bookCode}-${parsedReference.chapter}-${verse.number}`,
             translationName: 'Nag Hammadi Coptic Text',
@@ -1180,19 +1204,20 @@ async function buildLinkedVerseRows(
           if (content.translationName === 'Interlinear') {
             continue;
           }
-          if (isThomasBookCode(parsedReference.bookCode)
-            && isNagHammadiCopticTranslation(content.translationName)) {
-            continue;
-          }
-          if (isThomasBookCode(parsedReference.bookCode)
-            && isThomasCopticMachineTranslation(content.translationName)) {
-            continue;
-          }
-          if (
-            (content.translationCode && EXCLUDED_TRANSLATIONS.includes(content.translationCode)) ||
-            EXCLUDED_TRANSLATIONS.includes(content.translationName)
-          ) {
-            continue;
+          const { translationCode, translationName } = content;
+          if (isThomas) {
+            if (isNagHammadiCopticTranslation(translationName)
+              || isThomasCopticMachineTranslation(translationName)
+              || EXCLUDED_TRANSLATIONS.includes(translationCode ?? '')
+              || EXCLUDED_TRANSLATIONS.includes(translationName)) {
+              continue;
+            }
+          } else {
+            const code = translationCode?.trim();
+            const selected = code
+              ? BIBLE_TRANSLATIONS.has(code.toUpperCase())
+              : BIBLE_TRANSLATION_NAMES.has(translationName);
+            if (!selected) continue;
           }
 
           const currentRows = grouped.get(content.translationName) ?? [];
@@ -1502,6 +1527,7 @@ export function NewGospelPage() {
       start,
       end,
     }]);
+    setMarking(false);
   }
 
   function deleteMark(id: string) {
