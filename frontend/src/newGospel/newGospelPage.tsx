@@ -5,6 +5,7 @@ import {
   Alert,
   Badge,
   Button,
+  CloseButton,
   Container,
   Drawer,
   Group,
@@ -22,7 +23,7 @@ import {
   type TreeNodeData,
 } from '@mantine/core';
 import { IconGripVertical, IconHighlight, IconTrash } from '@tabler/icons-react';
-import { useDebouncedState } from '@mantine/hooks';
+import { useDebouncedState, useDebouncedValue } from '@mantine/hooks';
 import { executeVardaRequest } from '../lib/client';
 import { useGospelStore } from '../lib/store';
 import { ComparisonPage } from '../comparison/comparisonPage';
@@ -1248,6 +1249,9 @@ export function NewGospelPage() {
   const [drawerOpened, setDrawerOpened] = useState<boolean>(false);
   const [filterInput, setFilterInput] = useState('');
   const [debouncedFilter, setDebouncedFilter] = useDebouncedState('', 200);
+  const verseFilterRef = useRef<HTMLInputElement>(null);
+  const [verseFilter, setVerseFilter] = useState('');
+  const [debouncedVerseFilter] = useDebouncedValue(verseFilter, 300);
   const [pericopeTree, setPericopeTree] = useState<TreeNodeData[]>([]);
   const [verse, setVerse] = useState<NewGospelVerseRecord | null>(null);
   const [verseDraft, setVerseDraft] = useState('');
@@ -1545,9 +1549,16 @@ export function NewGospelPage() {
     updateMarks(next);
   }
 
-  const visibleRows = hasInterlinearRows
-    ? rows.filter((row) => row.translationName !== 'Interlinear')
-    : rows;
+  const phrase = verseFilter ? debouncedVerseFilter.trim().toLowerCase() : '';
+  const translationRows = hasInterlinearRows ? rows.filter((row) => row.translationName !== 'Interlinear') : rows;
+  const visibleRows = translationRows.filter((row) => row.text.toLowerCase().includes(phrase));
+  const visibleInterlinearRows = phrase
+    ? interlinearRows.filter((row) =>
+      (['englishGloss', 'original', 'transliteration'] as const).some((field) =>
+        row.tokens.map((token) => token[field]).filter(Boolean).join(' ').toLowerCase().includes(phrase),
+      ),
+    )
+    : interlinearRows;
 
   const tableRows = visibleRows.map((row, index) => {
     const previousRow = index > 0 ? visibleRows[index - 1] : null;
@@ -1578,8 +1589,8 @@ export function NewGospelPage() {
     );
   });
 
-  const interlinearBlocks = interlinearRows.map((row, rowIndex) => {
-    const previousRow = rowIndex > 0 ? interlinearRows[rowIndex - 1] : null;
+  const interlinearBlocks = visibleInterlinearRows.map((row, rowIndex) => {
+    const previousRow = rowIndex > 0 ? visibleInterlinearRows[rowIndex - 1] : null;
     const showTranslation = !previousRow || previousRow.translationName !== row.translationName;
 
     return (
@@ -1652,7 +1663,8 @@ export function NewGospelPage() {
 
       <Tabs.Panel value="new_gospel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Container
-          size="100%"
+          fluid
+          w="100%"
           px={0}
           style={{ flex: 1, minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         >
@@ -1832,6 +1844,36 @@ export function NewGospelPage() {
             }}>
               {showResult ? 'Show Verses' : 'Show Result'}
             </Button>
+            {!showResult && (
+              <Group gap="xs" ml="auto" w="min(100%, 32rem)" wrap="nowrap">
+                {phrase && (
+                  <Text size="sm" c="dimmed" role="status" style={{ flex: 1, textAlign: 'right' }}>
+                    {visibleRows.length + visibleInterlinearRows.length} of {translationRows.length + interlinearRows.length} verses
+                  </Text>
+                )}
+                <TextInput
+                  ref={verseFilterRef}
+                  rightSection={verseFilter && (
+                    <CloseButton
+                      aria-label="Clear verse filter"
+                      size="sm"
+                      onClick={() => {
+                        setVerseFilter('');
+                        verseFilterRef.current?.focus();
+                      }}
+                    />
+                  )}
+                  rightSectionPointerEvents="auto"
+                  aria-label="Filter verses"
+                  placeholder="Filter verses by phrase"
+                  ml="auto"
+                  w="75%"
+                  style={{ flexShrink: 0 }}
+                  value={verseFilter}
+                  onChange={(event) => setVerseFilter(event.currentTarget.value)}
+                />
+              </Group>
+            )}
           </Group>
         ) : null}
 
@@ -1896,6 +1938,8 @@ export function NewGospelPage() {
                   </>
                 )}
               </Stack>
+            ) : phrase && !visibleRows.length && !visibleInterlinearRows.length ? (
+              <Text c="dimmed">No matching verses.</Text>
             ) : hasLinkedVerses ? (
               <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <Group
@@ -1911,7 +1955,7 @@ export function NewGospelPage() {
                   <div style={{ flex: 1 }}>Verse</div>
                 </Group>
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-                  {hasInterlinearRows ? (
+                  {visibleInterlinearRows.length > 0 ? (
                     <div
                       style={{
                         borderLeft: '1px solid var(--mantine-color-gray-3)',
