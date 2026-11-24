@@ -13,9 +13,11 @@ use crate::model::ChapterBody;
 pub mod bible_com;
 pub mod bible_gateway;
 pub mod bible_hub;
+pub mod bible_hub_blb;
 pub mod ibep;
 pub mod obd;
 pub mod oeb;
+pub mod sacred_bible;
 pub mod study_bible;
 
 /// One chapter to load, with everything a site needs to identify it.
@@ -55,8 +57,10 @@ pub fn implementation(module: &str) -> Option<&'static dyn Site> {
         "bible_gateway" => Some(&bible_gateway::BibleGateway),
         "study_bible" => Some(&study_bible::StudyBible),
         "bible_hub" => Some(&bible_hub::BibleHub),
+        "bible_hub_blb" => Some(&bible_hub_blb::BibleHubBlb),
         "obd" => Some(&obd::Obd),
         "oeb" => Some(&oeb::Oeb),
+        "sacred_bible" => Some(&sacred_bible::SacredBible),
         _ => None,
     }
 }

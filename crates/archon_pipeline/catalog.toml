@@ -230,6 +230,96 @@ ready = "#fx iframe"          # interlinear words are rendered inside this ifram
 book_slug = "lower"
 interlinear = true
 
+[sites.bible_hub_blb]
+name = "BibleHub (Berean Literal Bible)"
+module = "bible_hub_blb"
+url = "https://biblehub.com/blb/{book}/{chapter}.htm"
+ready = "#leftbox .grk .reftext"
+book_slug = "lower"
+
+[sites.sacred_bible]
+name = "SacredBible.org"
+module = "sacred_bible"
+url = "https://sacredbible.org/catholic/{book}.htm"
+ready = "a.chapter"
+book_slug = "map"
+unit = "book"
+
+[sites.sacred_bible.book_codes]
+"GEN" = "OT-01_Genesis"
+"EXO" = "OT-02_Exodus"
+"LEV" = "OT-03_Leviticus"
+"NUM" = "OT-04_Numbers"
+"DEU" = "OT-05_Deuteronomy"
+"JOS" = "OT-06_Joshua"
+"JDG" = "OT-07_Judges"
+"RUT" = "OT-08_Ruth"
+"1SA" = "OT-09_1-Samuel"
+"2SA" = "OT-10_2-Samuel"
+"1KI" = "OT-11_1-Kings"
+"2KI" = "OT-12_2-Kings"
+"1CH" = "OT-13_1-Chronicles"
+"2CH" = "OT-14_2-Chronicles"
+"EZR" = "OT-15_Ezra"
+"NEH" = "OT-16_Nehemiah"
+"TOB" = "OT-17_Tobit"
+"JDT" = "OT-18_Judith"
+"EST" = "OT-19_Esther"
+"JOB" = "OT-20_Job"
+"PSA" = "OT-21_Psalms"
+"PRO" = "OT-22_Proverbs"
+"ECC" = "OT-23_Ecclesiastes"
+"SNG" = "OT-24_Song"
+"WIS" = "OT-25_Wisdom"
+"SIR" = "OT-26_Sirach"
+"ISA" = "OT-27_Isaiah"
+"JER" = "OT-28_Jeremiah"
+"LAM" = "OT-29_Lamentations"
+"BAR" = "OT-30_Baruch"
+"EZK" = "OT-31_Ezekiel"
+"DAN" = "OT-32_Daniel"
+"HOS" = "OT-33_Hosea"
+"JOL" = "OT-34_Joel"
+"AMO" = "OT-35_Amos"
+"OBA" = "OT-36_Obadiah"
+"JON" = "OT-37_Jonah"
+"MIC" = "OT-38_Micah"
+"NAM" = "OT-39_Nahum"
+"HAB" = "OT-40_Habakkuk"
+"ZEP" = "OT-41_Zephaniah"
+"HAG" = "OT-42_Haggai"
+"ZEC" = "OT-43_Zechariah"
+"MAL" = "OT-44_Malachi"
+"1MA" = "OT-45_1-Maccabees"
+"2MA" = "OT-46_2-Maccabees"
+"MAT" = "NT-01_Matthew"
+"MRK" = "NT-02_Mark"
+"LUK" = "NT-03_Luke"
+"JHN" = "NT-04_John"
+"ACT" = "NT-05_Acts"
+"ROM" = "NT-06_Romans"
+"1CO" = "NT-07_1-Corinthians"
+"2CO" = "NT-08_2-Corinthians"
+"GAL" = "NT-09_Galatians"
+"EPH" = "NT-10_Ephesians"
+"PHP" = "NT-11_Philippians"
+"COL" = "NT-12_Colossians"
+"1TH" = "NT-13_1-Thessalonians"
+"2TH" = "NT-14_2-Thessalonians"
+"1TI" = "NT-15_1-Timothy"
+"2TI" = "NT-16_2-Timothy"
+"TIT" = "NT-17_Titus"
+"PHM" = "NT-18_Philemon"
+"HEB" = "NT-19_Hebrews"
+"JAS" = "NT-20_James"
+"1PE" = "NT-21_1-Peter"
+"2PE" = "NT-22_2-Peter"
+"1JN" = "NT-23_1-John"
+"2JN" = "NT-24_2-John"
+"3JN" = "NT-25_3-John"
+"JUD" = "NT-26_Jude"
+"REV" = "NT-27_Revelation"
+
 [sites.oeb]
 name = "Open English Bible"
 module = "oeb"
@@ -313,6 +403,12 @@ exclude = [
 
 
 [translations.en]
+bible_hub_blb = [
+  { code = "BLB", name = "Berean Literal Bible", exclude = ["TOB", "JDT", "ESG", "WIS", "SIR", "BAR", "LJE", "S3Y", "SUS", "BEL", "1MA", "2MA", "3MA", "4MA", "1ES", "2ES", "MAN", "PS2", "ADE"] },
+]
+sacred_bible = [
+  { code = "CPDV", name = "Catholic Public Domain Version", exclude = ["ESG", "LJE", "S3Y", "SUS", "BEL", "3MA", "4MA", "1ES", "2ES", "MAN", "PS2", "ADE"], chapters = { EST = 15, BAR = 6, DAN = 14 } },
+]
 bible_gateway = [
   { code = "AKJV",     name = "Authorized (King James) Version" },
   { code = "AMP",      name = "Amplified Bible" },

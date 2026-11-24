@@ -24,7 +24,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Fetch chapters into output/gospels (live fetching requires Chromium and PIA_USER / PIA_PASS)
+    /// Fetch chapters into output/gospels (PIA credentials can come from crates/pia_proxy/.env)
     Scrape {
         /// Preview URLs and output paths offline
         #[arg(long)]
@@ -184,12 +184,55 @@ fn run_command(command: Commands) -> anyhow::Result<()> {
     Ok(())
 }
 
+struct ChromiumProtocolFilter;
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for ChromiumProtocolFilter {
+    fn event_enabled(
+        &self,
+        event: &tracing::Event<'_>,
+        _: tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
+        !is_chromium_protocol_noise(event)
+    }
+}
+
+fn is_chromium_protocol_noise(event: &tracing::Event<'_>) -> bool {
+    if !matches!(
+        event.metadata().target(),
+        "chromiumoxide::conn" | "chromiumoxide::handler"
+    ) {
+        return false;
+    }
+
+    #[derive(Default)]
+    struct MessageMatch(bool);
+    impl tracing::field::Visit for MessageMatch {
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            if field.name() == "message" {
+                let message = format!("{value:?}");
+                self.0 = (message.starts_with("Failed to deserialize WS response ")
+                    || message.starts_with("WS Connection error: Serde("))
+                    && message.contains("data did not match any variant of untagged enum Message");
+            }
+        }
+    }
+    let mut message = MessageMatch::default();
+    event.record(&mut message);
+    message.0
+}
+
 fn main() {
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
     // 1. Initialize Logging (Basic)
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "info,archon=debug,fjall=warn,lsm_tree=warn".into());
 
-    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(ChromiumProtocolFilter)
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     // Check if we are a CEF subprocess (e.g. GPU process, Renderer)
     // If so, we should NOT start the database or other heavy backend services.

@@ -1,7 +1,7 @@
 # pia-proxy configuration
 #
 # Credentials are not stored here: the proxy reads PIA_USER / PIA_PASS from the
-# environment, which the app loads from the project's .env file.
+# environment or a .env file next to this config.
 #
 # This file holds only the listener, rotation and region settings.
 

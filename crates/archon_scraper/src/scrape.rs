@@ -285,6 +285,7 @@ async fn fetch_plans(root: &Path, config: &Config, plans: Vec<Plan>, mut report:
 
                 let ready = translation.ready.clone().unwrap_or_default();
                 let mut attempt = 1u32;
+                eprintln!("Fetching {}/{} from {url}", translation.code, chapter_ref.passage());
 
                 // One browser for the whole run. The proxy endpoint never
                 // changes, and 8889 picks the region per connection, so a retry
@@ -329,6 +330,7 @@ async fn fetch_plans(root: &Path, config: &Config, plans: Vec<Plan>, mut report:
                         match Store::save_atomic(&path, html.as_bytes()) {
                             Ok(()) => {
                                 report.record_saved();
+                                eprintln!("Saved {} ({verses} verses checked)", path.display());
                                 manifest.chapters.insert(
                                     chapter,
                                     ChapterEntry::new(url, verses, html.len()),

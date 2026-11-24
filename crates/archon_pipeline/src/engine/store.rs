@@ -1,8 +1,9 @@
 //! Where scraped and derived artefacts live, and how they are written.
 //!
 //! Layout, all under the configured roots:
-//!   gospels/<language>/<translation>/<USFM>/chapter_<n>.html
-//!   gospels/<language>/<translation>/<USFM>/manifest.json
+//!   gospels/<language>/<translation>/<USFM>/chapter_<n>.html by default
+//!   gospels/en/<book short name>/<translation>/ for BLB and CPDV
+//!   manifest.json beside the source HTML
 //!   json/<language>/<translation>/<USFM>/chapter_<n>.json
 
 use anyhow::{Context, Result};
@@ -180,6 +181,26 @@ mod tests {
             store.json_path(&oeb, luke, 7),
             Path::new("/project/json/en/OEB/LUK/chapter_7.json")
         );
+    }
+
+    #[test]
+    fn blb_and_cpdv_manifests_follow_the_book_first_html_layout() {
+        let catalog = catalog();
+        let store = store();
+        let genesis = catalog.book("GEN").unwrap();
+        for (code, filename) in [("BLB", "chapter_1.html"), ("CPDV", "book.html")] {
+            let translation = catalog.resolve("en", code).unwrap();
+            let directory = Path::new("/project/gospels/en/Gen").join(code);
+            assert_eq!(store.html_path(&translation, genesis, 1), directory.join(filename));
+            assert_eq!(
+                store.manifest_path(&translation, genesis),
+                directory.join("manifest.json")
+            );
+            assert_eq!(
+                store.json_path(&translation, genesis, 1),
+                Path::new("/project/json/en").join(code).join("GEN/chapter_1.json")
+            );
+        }
     }
 
     #[test]

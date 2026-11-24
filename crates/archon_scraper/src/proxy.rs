@@ -58,7 +58,7 @@ async fn load_config(root: &Path, pool: &crate::config::ProxyPool) -> Result<pia
     let path = crate::resolve_path(root, &pool.config);
     let mut config = pia_proxy::Config::load(&path).await.with_context(|| {
         format!(
-            "loading the PIA proxy config at {} — it needs at least one [[regions]] entry, and PIA_USER / PIA_PASS in the environment",
+            "loading the PIA proxy config at {}",
             path.display()
         )
     })?;

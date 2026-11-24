@@ -26,6 +26,39 @@ fn parses_minimal_config() {
     assert!(config.socks5.is_none());
 }
 
+#[tokio::test]
+async fn loads_credentials_from_the_dotenv_next_to_the_config() {
+    let dir = std::env::temp_dir().join(format!("pia-config-test-{}", std::process::id()));
+    std::fs::create_dir(&dir).unwrap();
+    let path = dir.join("config.toml");
+    std::fs::write(&path, "[[regions]]\nid = 'us_chicago'\n").unwrap();
+    std::fs::write(
+        dir.join(".env"),
+        "PIA_USER = 'fixture-user'\nPIA_PASS = 'fixture password #1'\n",
+    )
+    .unwrap();
+    let result = Config::load(&path).await;
+    std::fs::remove_dir_all(dir).unwrap();
+    let config = result.unwrap();
+    let expected_user = std::env::var("PIA_USER").ok();
+    let expected_pass = std::env::var("PIA_PASS").ok();
+    assert!(
+        config.pia.username
+            == expected_user
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("fixture-user")
+    );
+    assert!(
+        config.pia.password
+            == expected_pass
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .unwrap_or("fixture password #1")
+    );
+}
+
 #[test]
 fn rejects_missing_credentials() {
     let raw = r#"
@@ -37,7 +70,10 @@ password = ""
 id = "us_chicago"
 "#;
     let error = Config::from_str(raw).expect_err("empty credentials must fail");
-    assert!(error.to_string().contains("PIA_USER"), "unexpected: {error}");
+    assert!(
+        error.to_string().contains("PIA_USER"),
+        "unexpected: {error}"
+    );
 }
 
 #[test]
@@ -133,6 +169,9 @@ fn unknown_region_suggests_near_matches() {
     let regions = vec![region("us_chicago"), region("us_new_york_city")];
     let error = PiaClient::find_region(&regions, "us_new_york").expect_err("must be unknown");
     let message = error.to_string();
-    assert!(message.contains("unknown PIA region 'us_new_york'"), "{message}");
+    assert!(
+        message.contains("unknown PIA region 'us_new_york'"),
+        "{message}"
+    );
     assert!(message.contains("us_new_york_city"), "{message}");
 }

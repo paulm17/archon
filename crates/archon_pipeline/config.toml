@@ -162,6 +162,14 @@ translations = ["FBV"]
 books = ["GEN"]
 chapters = [1]
 
+[[targets]]
+name = "blb"
+site = "bible_hub_blb"
+
+[[targets]]
+name = "cpdv"
+site = "sacred_bible"
+
 # ----------------------------------------------------------------------------
 # Workflow options
 # ----------------------------------------------------------------------------

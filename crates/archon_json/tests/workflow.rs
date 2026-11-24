@@ -85,3 +85,131 @@ fn json_is_produced_from_saved_html() {
 
     std::fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn extracts_blb_and_cpdv_without_touching_existing_files() {
+    let root = temp_dir("blb_cpdv");
+    let mut blb = String::from(
+        r##"
+        <title>Luke 10 Berean Literal Bible</title>
+        <div id="leftbox"><div class="grk">
+        <p class="hdg">A section heading<br><span class="cross">(Matthew 1:1)</span>
+        <p class="reg">
+    "##,
+    );
+    let mut cpdv = String::from(
+        r##"
+        <title>Luke - Catholic Public Domain Version of the Sacred Bible</title>
+        <a class=title href="NT-03_Luke.htm">The Gospel of Luke</a>
+        <font size=4>[<a class=chapter href="#top">Luke 9</a>]<br>{P:1} Prologue.<br>{9:1} Previous chapter.<br>
+        [<a class=chapter href="#top">Luke 10</a>]<br>
+    "##,
+    );
+    for verse in 1..=42 {
+        blb.push_str(&format!(
+            r#"<span class="reftext"><a href="/luke/10-{verse}.htm"><b>{verse}</b></a></span>BLB verse {verse}."#
+        ));
+        if verse == 1 {
+            blb.push_str(r##"<span class="fn"><a href="#fn">‡</a></span>"##);
+        }
+        cpdv.push_str(&format!("{{10:{verse}}} CPDV verse {verse}.<br>\n"));
+    }
+    blb.push_str(
+        r#"<p><a name="fn"></a><br><b>Footnotes:</b><br>
+        <span class="fnverse">1</span> A <i>footnote</i>.<br></div></div>"#,
+    );
+    cpdv.push_str(
+        r##"[<a class=chapter href="#top">Luke 11</a>]<br>{11:1} Next chapter.<br></font>"##,
+    );
+    let earlier = temp_dir("blb_cpdv_earlier_layout");
+    let earlier_blb = "gospels/en/BLB/LUK/chapter_10.html";
+    let earlier_cpdv = "gospels/en/CPDV/LUK/book.html";
+    write(earlier.join(earlier_blb), &blb);
+    write(earlier.join(earlier_cpdv), &cpdv);
+
+    write(root.join("gospels/en/Luke/BLB/chapter_10.html"), &blb);
+    write(root.join("gospels/en/Luke/CPDV/book.html"), &cpdv);
+    let alternate_blb = blb.replace("BLB verse", "Alternate BLB verse");
+    let alternate_cpdv = cpdv.replace("CPDV verse", "Alternate CPDV verse");
+    write(root.join(earlier_blb), &alternate_blb);
+    write(root.join(earlier_cpdv), &alternate_cpdv);
+    write(root.join("gospels/en/NIV/GEN/chapter_1.html"), GATEWAY);
+    let sentinel = root.join("json/en/NIV/GEN/chapter_1.json");
+    write(sentinel.clone(), "existing output");
+
+    let translations = &["blb", "CPDV"];
+    let earlier_outcome = archon_json::run(&earlier, translations).unwrap();
+    assert!(
+        earlier_outcome.failed.is_empty(),
+        "{:?}",
+        earlier_outcome.failed
+    );
+    assert_eq!(earlier_outcome.converted, 4);
+    for code in ["BLB", "CPDV"] {
+        assert!(
+            earlier
+                .join(format!("json/en/{code}/LUK/chapter_10.json"))
+                .is_file()
+        );
+    }
+    let outcome = archon_json::run(&root, translations).unwrap();
+    assert!(outcome.failed.is_empty(), "{:?}", outcome.failed);
+    assert_eq!(outcome.converted, 4);
+    let chapter = |code, chapter| {
+        let path = root.join(format!("json/en/{code}/LUK/chapter_{chapter}.json"));
+        serde_json::from_slice::<archon_pipeline::model::ChapterData>(&std::fs::read(path).unwrap())
+            .unwrap()
+    };
+    for code in ["BLB", "CPDV"] {
+        let data = chapter(code, 10);
+        assert_eq!(data.translation_code, code);
+        assert_eq!(data.book_name, "Luke");
+        assert_eq!(data.chapter, 10);
+        assert_eq!(data.verses.len(), 42);
+        assert_eq!(data.verses[41].verse, 42);
+        assert_eq!(
+            data.verses[41].content[0].text,
+            Some(format!("{code} verse 42."))
+        );
+    }
+    let blb = chapter("BLB", 10);
+    assert_eq!(
+        blb.verses[0].header[0].text.as_deref(),
+        Some("A section heading")
+    );
+    assert_eq!(
+        blb.verses[0].content[0].text.as_deref(),
+        Some("BLB verse 1.")
+    );
+    assert_eq!(blb.footnotes[0].text, "A footnote.");
+    assert_eq!(
+        blb.verses[0].content[1].id.as_ref(),
+        Some(&blb.footnotes[0].id)
+    );
+    assert_eq!(
+        chapter("CPDV", 9).verses[0].content[0].text.as_deref(),
+        Some("Previous chapter.")
+    );
+    assert_eq!(
+        chapter("CPDV", 11).verses[0].content[0].text.as_deref(),
+        Some("Next chapter.")
+    );
+
+    let rerun = archon_json::run(&root, translations).unwrap();
+    assert!(rerun.failed.is_empty(), "{:?}", rerun.failed);
+    assert_eq!((rerun.converted, rerun.skipped), (0, 4));
+    assert_eq!(
+        std::fs::read_to_string(sentinel).unwrap(),
+        "existing output"
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join(earlier_blb)).unwrap(),
+        alternate_blb
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.join(earlier_cpdv)).unwrap(),
+        alternate_cpdv
+    );
+    std::fs::remove_dir_all(&root).unwrap();
+    std::fs::remove_dir_all(&earlier).unwrap();
+}

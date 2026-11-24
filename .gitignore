@@ -16,3 +16,4 @@ db_data/
 .DS_Store
 
 /output/
+/crates/pia_proxy/.env

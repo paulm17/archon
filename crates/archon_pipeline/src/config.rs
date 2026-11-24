@@ -296,7 +296,7 @@ mod tests {
         let config: Config = toml::from_str(include_str!("../config.toml")).expect("config.toml");
         config.validate().unwrap();
         assert_eq!(config.output.gospels, "gospels");
-        assert_eq!(config.targets.len(), 13, "one target per site, plus the narrow test targets");
+        assert_eq!(config.targets.len(), 15, "one target per site, plus the narrow test targets");
         assert!(config.proxy.enabled);
         assert_eq!(config.proxy.endpoints[0].port, 8889);
         assert_eq!(config.retry.max_attempts, 10);

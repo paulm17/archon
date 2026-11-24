@@ -121,30 +121,71 @@ fn default_socks5_endpoint() -> String {
 }
 
 impl Config {
-    /// Read and validate `config.toml` from disk.
+    /// Read the configuration and any credentials in a sibling `.env` file.
     pub async fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        let raw = tokio::fs::read_to_string(path).await.map_err(|e| {
-            ProxyError::Config(format!("cannot read {}: {e}", path.display()))
-        })?;
-        Self::from_str(&raw)
+        let raw = tokio::fs::read_to_string(path)
+            .await
+            .map_err(|e| ProxyError::Config(format!("cannot read {}: {e}", path.display())))?;
+        let mut credentials = Self::environment_credentials();
+        if credentials.username.is_empty() || credentials.password.is_empty() {
+            let env_path = path.with_file_name(".env");
+            match tokio::fs::read(&env_path).await {
+                Ok(bytes) => {
+                    let mut fallback = Pia::default();
+                    for entry in dotenvy::from_read_iter(bytes.as_slice()) {
+                        let (key, value) = entry.map_err(|_| {
+                            ProxyError::Config(format!("cannot parse {}", env_path.display()))
+                        })?;
+                        match key.as_str() {
+                            "PIA_USER" => fallback.username = value.trim().to_owned(),
+                            "PIA_PASS" => fallback.password = value,
+                            _ => {}
+                        }
+                    }
+                    if credentials.username.is_empty() {
+                        credentials.username = fallback.username;
+                    }
+                    if credentials.password.is_empty() {
+                        credentials.password = fallback.password;
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(ProxyError::Config(format!(
+                        "cannot read {}: {error}",
+                        env_path.display()
+                    )))
+                }
+            }
+        }
+        Self::with_credentials(&raw, credentials)
     }
 
     /// Parse and validate configuration text.
     pub fn from_str(raw: &str) -> Result<Self> {
+        Self::with_credentials(raw, Self::environment_credentials())
+    }
+
+    fn environment_credentials() -> Pia {
+        Pia {
+            username: std::env::var("PIA_USER")
+                .unwrap_or_default()
+                .trim()
+                .to_owned(),
+            password: std::env::var("PIA_PASS").unwrap_or_default(),
+        }
+    }
+
+    fn with_credentials(raw: &str, credentials: Pia) -> Result<Self> {
         let mut config: Config = toml::from_str(raw)
             .map_err(|e| ProxyError::Config(format!("cannot parse config: {e}")))?;
 
-        // Environment wins over the file so credentials can stay out of it.
-        if let Ok(user) = std::env::var("PIA_USER") {
-            if !user.trim().is_empty() {
-                config.pia.username = user.trim().to_string();
-            }
+        if !credentials.username.is_empty() {
+            config.pia.username = credentials.username;
         }
-        if let Ok(pass) = std::env::var("PIA_PASS") {
-            if !pass.is_empty() {
-                config.pia.password = pass;
-            }
+        if !credentials.password.is_empty() {
+            config.pia.password = credentials.password;
         }
 
         config.validate()?;
@@ -155,7 +196,7 @@ impl Config {
     pub fn validate(&self) -> Result<()> {
         if self.pia.username.trim().is_empty() || self.pia.password.is_empty() {
             return Err(ProxyError::Config(
-                "PIA_USER and PIA_PASS are required — export them in the environment".into(),
+                "PIA_USER and PIA_PASS are required in the environment or in .env next to the proxy config".into(),
             ));
         }
         if self.regions.is_empty() && self.socks5.is_none() {
@@ -164,7 +205,9 @@ impl Config {
             ));
         }
         if self.rotation.max_attempts == 0 {
-            return Err(ProxyError::Config("rotation.max_attempts must be at least 1".into()));
+            return Err(ProxyError::Config(
+                "rotation.max_attempts must be at least 1".into(),
+            ));
         }
         if self.rotation.failures_before_retire == 0 {
             return Err(ProxyError::Config(
@@ -179,7 +222,9 @@ impl Config {
         let mut seen = std::collections::HashSet::new();
         for region in &self.regions {
             if region.id.trim().is_empty() {
-                return Err(ProxyError::Config("a [[regions]] entry has an empty id".into()));
+                return Err(ProxyError::Config(
+                    "a [[regions]] entry has an empty id".into(),
+                ));
             }
             if !seen.insert(region.id.clone()) {
                 return Err(ProxyError::Config(format!(

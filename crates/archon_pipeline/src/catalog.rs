@@ -379,38 +379,41 @@ fn check_placeholders(
 }
 
 impl Resolved {
-    /// `gospels/<language>/<code>/<USFM>/chapter_<n>.html` — the relative part.
+    /// The language and translation segment of translation-first paths.
     pub fn relative_dir(&self) -> PathBuf {
         Path::new(&self.language).join(&self.code)
     }
 
     pub fn chapter_path(&self, root: &Path, book: &Book, chapter: u32) -> PathBuf {
-        root.join(self.relative_dir())
-            .join(&book.usfm)
+        self.source_dir(root, book)
             .join(format!("chapter_{chapter}.html"))
+    }
+
+    fn source_dir(&self, root: &Path, book: &Book) -> PathBuf {
+        if self.language == "en" && matches!(self.code.as_str(), "BLB" | "CPDV") {
+            root.join(&self.language).join(&book.short).join(&self.code)
+        } else {
+            root.join(self.relative_dir()).join(&book.usfm)
+        }
     }
 
     /// Where the scraped HTML for a chapter lives. Whole-book sites deliver
     /// every chapter in one document, so they keep a single `book.html`.
     pub fn source_path(&self, root: &Path, book: &Book, chapter: u32) -> PathBuf {
         match self.unit {
-            Unit::Book => root
-                .join(self.relative_dir())
-                .join(&book.usfm)
-                .join("book.html"),
+            Unit::Book => self.source_dir(root, book).join("book.html"),
             Unit::Chapter => self.chapter_path(root, book, chapter),
         }
     }
 
     pub fn json_path(&self, root: &Path, book: &Book, chapter: u32) -> PathBuf {
-        self.chapter_path(root, book, chapter)
-            .with_extension("json")
+        root.join(self.relative_dir())
+            .join(&book.usfm)
+            .join(format!("chapter_{chapter}.json"))
     }
 
     pub fn manifest_path(&self, root: &Path, book: &Book) -> PathBuf {
-        root.join(self.relative_dir())
-            .join(&book.usfm)
-            .join("manifest.json")
+        self.source_dir(root, book).join("manifest.json")
     }
 
     /// Chapter count for a book, honouring a per-translation override.
@@ -535,8 +538,8 @@ mod tests {
         let catalog = catalog();
         assert_eq!(catalog.validate(), Vec::<String>::new());
         assert_eq!(catalog.books.len(), 85);
-        assert_eq!(catalog.sites.len(), 7);
-        assert_eq!(catalog.translation_ids().len(), 89);
+        assert_eq!(catalog.sites.len(), 9);
+        assert_eq!(catalog.translation_ids().len(), 91);
     }
 
     #[test]

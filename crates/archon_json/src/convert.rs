@@ -55,6 +55,24 @@ impl Source<'_> {
             "bible_hub" => biblehub::convert(path, book, pretty),
             "study_bible" => biblestudy::convert(path, book, pretty),
             "oeb" => bibleoeb::convert(path, book, &self.translation.code, pretty),
+            "sacred_bible" => {
+                let bytes = std::fs::read(path)?;
+                // Chromium saves UTF-8, but the publisher also distributes
+                // HTML declared as Windows-1252.
+                let html = match std::str::from_utf8(&bytes) {
+                    Ok(html) => std::borrow::Cow::Borrowed(html),
+                    Err(_) => encoding_rs::WINDOWS_1252.decode(&bytes).0,
+                };
+                let reference = ChapterRef {
+                    book: self.book,
+                    translation: self.translation,
+                    chapter: self.chapter,
+                };
+                sites::sacred_bible::book_chapters(&html, &reference)?
+                    .into_iter()
+                    .map(|(number, data)| render(number, &data, pretty))
+                    .collect()
+            }
             module => {
                 let site = sites::implementation(module)
                     .with_context(|| format!("unknown site {module}"))?;
