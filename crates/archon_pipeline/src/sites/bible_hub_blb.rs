@@ -15,6 +15,12 @@ impl Site for BibleHubBlb {
         let verses = Selector::parse("#leftbox .grk .reftext").unwrap();
         Html::parse_document(html)
             .select(&verses)
+            .filter(|element| {
+                !element
+                    .ancestors()
+                    .filter_map(ElementRef::wrap)
+                    .any(is_heading)
+            })
             .enumerate()
             .filter(|(index, element)| {
                 *index == 0 || element.text().any(|text| !text.trim().is_empty())
@@ -48,6 +54,8 @@ impl Site for BibleHubBlb {
                 reference.chapter,
             ),
             verse_prefix: format!("/{slug}/{}-", reference.chapter),
+            is_psalm: reference.usfm() == "PSA",
+            has_chapter_link: false,
             text: String::new(),
             headings: Vec::new(),
             paragraph_start: true,
@@ -61,6 +69,11 @@ impl Site for BibleHubBlb {
             "No BLB verses found for {}",
             reference.passage()
         );
+        ensure!(
+            parser.has_chapter_link,
+            "Missing BLB verse link for {}",
+            reference.passage()
+        );
         Ok(ChapterBody::Standard(parser.data))
     }
 }
@@ -68,6 +81,8 @@ impl Site for BibleHubBlb {
 struct ChapterParser {
     data: ChapterData,
     verse_prefix: String,
+    is_psalm: bool,
+    has_chapter_link: bool,
     text: String,
     headings: Vec<ContentItem>,
     paragraph_start: bool,
@@ -99,10 +114,7 @@ impl ChapterParser {
                         }
                     } else if has_class(element, "reftext") {
                         self.start_verse(element)?;
-                    } else if ["hdg", "ihdg", "subhdg", "suphdg", "pshdg", "acrostic"]
-                        .iter()
-                        .any(|class| has_class(element, class))
-                    {
+                    } else if is_heading(element) {
                         self.flush();
                         let heading = heading_text(element);
                         if !heading.is_empty() {
@@ -130,15 +142,20 @@ impl ChapterParser {
         let label = element.text().collect::<String>();
         let label = label.trim();
         let link = Selector::parse("a[href]").unwrap();
-        let target = element
+        let href = element
             .select(&link)
             .next()
-            .and_then(|anchor| anchor.attr("href"))
+            .and_then(|anchor| anchor.attr("href"));
+        let target = href
             .and_then(|href| href.strip_prefix(&self.verse_prefix))
             .and_then(|suffix| suffix.strip_suffix(".htm"))
             .and_then(|number| number.parse::<u32>().ok());
+        // After a Psalm superscription, BibleHub can link the printed verse 1
+        // to a placeholder. A numbered verse link still confirms the chapter.
+        let placeholder =
+            self.is_psalm && self.data.verses.is_empty() && label == "1" && href == Some("#");
         ensure!(
-            target.is_some(),
+            target.is_some() || placeholder,
             "Unexpected BLB verse link, expected prefix {}",
             self.verse_prefix
         );
@@ -149,6 +166,7 @@ impl ChapterParser {
             "" => return Ok(()),
             number => number.parse::<u32>()?,
         };
+        self.has_chapter_link |= target.is_some();
         self.flush();
         ensure!(
             self.data
@@ -207,6 +225,12 @@ fn has_class(element: ElementRef<'_>, class: &str) -> bool {
     element.value().classes().any(|name| name == class)
 }
 
+fn is_heading(element: ElementRef<'_>) -> bool {
+    ["hdg", "ihdg", "subhdg", "suphdg", "pshdg", "acrostic"]
+        .iter()
+        .any(|class| has_class(element, class))
+}
+
 fn heading_text(element: ElementRef<'_>) -> String {
     let text = element
         .descendants()
@@ -229,6 +253,44 @@ fn heading_text(element: ElementRef<'_>) -> String {
 mod tests {
     use super::*;
     use crate::catalog::Catalog;
+
+    #[test]
+    fn parses_a_psalm_superscription_before_a_placeholder_verse_link() {
+        let catalog = Catalog::from_str(crate::CATALOG).unwrap();
+        let translation = catalog.resolve("en", "BLB").unwrap();
+        let chapter = ChapterRef {
+            translation: &translation,
+            book: catalog.book("PSA").unwrap(),
+            chapter: 3,
+        };
+        let html = r##"
+            <title>Psalm 3 Berean Literal Bible</title>
+            <div id="leftbox"><div class="grk">
+            <p class="pshdg"><span class="reftext"><a href="/psalms/3-1.htm"><b></b></a></span>Superscription.
+            <p><span class="reftext"><a href="#"><b>1</b></a></span>First verse.
+            <span class="reftext"><a href="/psalms/3-2.htm"><b>2</b></a></span>Second verse.
+            </div></div>
+        "##;
+        let ChapterBody::Standard(data) = BibleHubBlb.parse(html, &chapter).unwrap() else {
+            panic!("BLB must use the standard chapter schema");
+        };
+        assert_eq!(BibleHubBlb.verse_count(html, &chapter), 2);
+        assert_eq!(data.verses.len(), 2);
+        assert_eq!(data.verses[0].verse, 1);
+        assert_eq!(
+            data.verses[0].header[0].text.as_deref(),
+            Some("Superscription.")
+        );
+        assert_eq!(
+            data.verses[0].content[0].text.as_deref(),
+            Some("First verse.")
+        );
+        assert!(
+            BibleHubBlb
+                .validate(&html.replace("/psalms/3-2.htm", "#"), &chapter)
+                .is_err()
+        );
+    }
 
     #[test]
     fn uses_printed_labels_after_omissions_and_recovers_a_hidden_first_label() {
