@@ -190,6 +190,7 @@ type FixedInterlinearQueryResult = {
 };
 
 type LinkedVerseRow = {
+  rights?: string;
   key: string;
   translationName: string;
   display: string;
@@ -251,30 +252,35 @@ const PRIORITY_TRANSLATIONS = [
   'Interlinear',
   'Open English Bible',
 ];
+const PUBLIC_DOMAIN = 'Public domain';
+const TCNT = { name: 'Twentieth Century New Testament', rights: PUBLIC_DOMAIN };
 const BIBLE_TRANSLATIONS = new Map([
-  ["OEB", "Open English Bible"],
-  ["ASV", "American Standard Version"],
-  ["AKJV", "Authorized (King James) Version"],
-  ["BSB", "Berean Standard Bible"],
-  ["DARBY", "Darby Translation"],
-  ["DRA", "Douay-Rheims 1899 American Edition"],
-  ["KJV", "King James Version"],
-  ["TCNT", "Twentieth Century New Testament"],
-  ["TWENTIETH_CENTURY", "Twentieth Century New Testament"], // Legacy import code
-  ["WNT", "Weymouth New Testament"],
-  ["WEB", "World English Bible"],
-  ["YLT", "Young's Literal Translation"],
-  ["T4T", "Translation for Translators"],
-  ["LSV", "Literal Standard Version"],
-  ["FBV", "Free Bible Version"],
-  ["MSB", "Majority Standard Bible"],
-  ["ULT", "unfoldingWord Literal Text"],
-  ["UST", "unfoldingWord Simplified Text"],
-  ["WMBB", "World Messianic Bible \u2014 British Edition"],
-  ["NHEB", "New Heart English Bible"],
+  ["OEB", { name: "Open English Bible", rights: "Public domain (CC0)" }],
+  ["ASV", { name: "American Standard Version", rights: PUBLIC_DOMAIN }],
+  ["BSB", { name: "Berean Standard Bible", rights: PUBLIC_DOMAIN }],
+  ["DARBY", { name: "Darby Translation", rights: PUBLIC_DOMAIN }],
+  ["DRA", { name: "Douay-Rheims 1899 American Edition", rights: PUBLIC_DOMAIN }],
+  ["TCNT", TCNT],
+  ["TWENTIETH_CENTURY", TCNT],
+  ["WNT", { name: "Weymouth New Testament", rights: PUBLIC_DOMAIN }],
+  ["WEB", { name: "World English Bible", rights: PUBLIC_DOMAIN }],
+  ["YLT", { name: "Young's Literal Translation", rights: PUBLIC_DOMAIN }],
+  ["MSB", { name: "Majority Standard Bible", rights: PUBLIC_DOMAIN }],
+  ["WMBB", { name: "World Messianic Bible \u2014 British Edition", rights: PUBLIC_DOMAIN }],
+  ["NHEB", { name: "New Heart English Bible", rights: PUBLIC_DOMAIN }],
 ]);
-const BIBLE_TRANSLATION_NAMES = new Set(BIBLE_TRANSLATIONS.values());
-const EXCLUDED_TRANSLATIONS = ['NIV', 'ESV', 'NKJV', 'NLT', 'CSB', 'NRSVUE'];
+const BIBLE_TRANSLATIONS_BY_NAME = new Map(
+  [...BIBLE_TRANSLATIONS.values()].map((translation) => [translation.name, translation]),
+);
+const EXCLUDED_TRANSLATIONS = ['NIV', 'ESV', 'NKJV', 'NLT', 'CSB', 'NRSVUE',
+  'AKJV', 'Authorized (King James) Version',
+  'KJV', 'King James Version',
+  'T4T', 'Translation for Translators',
+  'LSV', 'Literal Standard Version',
+  'FBV', 'Free Bible Version',
+  'ULT', 'unfoldingWord Literal Text',
+  'UST', 'unfoldingWord Simplified Text',
+];
 const FIRST_COLUMN_WIDTH_PX = 400;
 
 function isThomasBookCode(bookCode: string): boolean {
@@ -516,6 +522,10 @@ function stripCanonicalDisplayMarkers(text: string): string {
     .replace(/\[(?:vs|cr|fn):\s*\w+\]/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
+
+function verseWords(text: string) {
+  return text.toLowerCase().replace(/['’]/gu, '').replace(/\p{P}+/gu, ' ').replace(/\s+/gu, ' ').trim();
 }
 
 function normalizeNewGospelVerse(result: NewGospelVerseQueryResult): NewGospelVerseRecord | null {
@@ -1206,6 +1216,10 @@ async function buildLinkedVerseRows(
             continue;
           }
           const { translationCode, translationName } = content;
+          const code = translationCode?.trim();
+          const translation = code
+            ? BIBLE_TRANSLATIONS.get(code.toUpperCase())
+            : BIBLE_TRANSLATIONS_BY_NAME.get(translationName);
           if (isThomas) {
             if (isNagHammadiCopticTranslation(translationName)
               || isThomasCopticMachineTranslation(translationName)
@@ -1213,16 +1227,13 @@ async function buildLinkedVerseRows(
               || EXCLUDED_TRANSLATIONS.includes(translationName)) {
               continue;
             }
-          } else {
-            const code = translationCode?.trim();
-            const selected = code
-              ? BIBLE_TRANSLATIONS.has(code.toUpperCase())
-              : BIBLE_TRANSLATION_NAMES.has(translationName);
-            if (!selected) continue;
+          } else if (!translation) {
+            continue;
           }
 
           const currentRows = grouped.get(content.translationName) ?? [];
           currentRows.push({
+            rights: translation?.rights,
             key: `${content.translationName}-${reference.display}-${parsedReference.bookCode}-${parsedReference.chapter}-${verse.number}-${currentRows.length}`,
             translationName: content.translationName,
             display: reference.display,
@@ -1262,6 +1273,8 @@ export function NewGospelPage() {
   const [marks, setMarks] = useState<VerseMark[]>([]);
   const [marking, setMarking] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [verseMatches, setVerseMatches] = useState(false);
+  const assembledVerse = marks.map((mark) => mark.text).join(' ');
   const pendingSave = useRef<Promise<void> | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -1567,7 +1580,12 @@ export function NewGospelPage() {
     return (
       <Table.Tr key={row.key}>
         <Table.Td style={{ width: FIRST_COLUMN_WIDTH_PX, minWidth: FIRST_COLUMN_WIDTH_PX }}>
-          {showTranslation ? <Text fw={600}>{row.translationName}</Text> : null}
+          {showTranslation && (
+            <>
+              <Text fw={600}>{row.translationName}</Text>
+              {row.rights && <Text size="sm" c="dimmed">{row.rights}</Text>}
+            </>
+          )}
         </Table.Td>
         <Table.Td>
           <Text span fw={600}>{row.referenceLabel}</Text>
@@ -1839,7 +1857,10 @@ export function NewGospelPage() {
               Mark
             </Button>
             <Button onClick={() => {
-              setShowResult((visible) => !visible);
+              if (!showResult) {
+                setVerseMatches(verseWords(verseDraft) === verseWords(assembledVerse));
+              }
+              setShowResult(!showResult);
               setMarking(false);
             }}>
               {showResult ? 'Show Verses' : 'Show Result'}
@@ -1892,7 +1913,7 @@ export function NewGospelPage() {
                   <Text c="dimmed">No phrases marked yet.</Text>
                 ) : (
                   <>
-                    <Text size="lg" fw={600}>{marks.map((mark) => mark.text).join(' ')}</Text>
+                    <Text size="lg" fw={600} c={verseMatches ? 'green' : 'red'}>{assembledVerse}</Text>
                     <DragDropProvider onDragEnd={({ canceled, operation: { source } }) => {
                       if (!canceled && isSortable(source) && typeof source.id === 'string') {
                         moveMark(source.id, source.index);
