@@ -1,5 +1,6 @@
 pub mod brain;
 pub mod config;
+mod new_gospel;
 pub mod startup;
 
 use clap::{Parser, Subcommand};
@@ -51,11 +52,10 @@ enum Commands {
         translation: Vec<String>,
     },
     /// Convert chapter JSON to JSONL and bulk-load a new scripture database
-    ScriptureImport {
-        /// Override scripture-import.input_dir from config.toml
-        #[arg(long)]
-        input: Option<std::path::PathBuf>,
-    },
+    BibleImport,
+    CompareNewGospel(new_gospel::compare::Cli),
+    IngestNewGospel(new_gospel::ingest::Cli),
+    ExportNewGospel(new_gospel::export::Cli),
     /// Database Management
     #[command(subcommand)]
     Db(vardadb::cli::DbCommands),
@@ -65,9 +65,22 @@ enum Commands {
 #[folder = "frontend/dist"] // Point this to your built UI assets
 struct Assets;
 
+fn bible_input_dir(config: &toml::Value) -> anyhow::Result<&str> {
+    config
+        .get("bible-import")
+        .or_else(|| config.get("scripture-import"))
+        .and_then(|section| section.get("input_dir"))
+        .and_then(toml::Value::as_str)
+        .filter(|path| !path.trim().is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Set bible-import.input_dir in config.toml"))
+}
+
 fn run_command(command: Commands) -> anyhow::Result<()> {
     let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("output");
     match command {
+        Commands::CompareNewGospel(args) => new_gospel::compare::run(args)?,
+        Commands::IngestNewGospel(args) => new_gospel::ingest::run(args)?,
+        Commands::ExportNewGospel(args) => new_gospel::export::run(args)?,
         Commands::Db(command) => {
             let config = startup::load_varda_config("config.toml")
                 .map_err(|e| anyhow::anyhow!("Failed to load config.toml: {e}"))?;
@@ -110,28 +123,15 @@ fn run_command(command: Commands) -> anyhow::Result<()> {
                 );
             }
         }
-        Commands::ScriptureImport { input } => {
+        Commands::BibleImport => {
             let config = startup::load_varda_config("config.toml")
                 .map_err(|e| anyhow::anyhow!("Failed to load config.toml: {e}"))?;
             let storage = std::path::Path::new(&config.server.storage_path);
             let destination = storage.join(archon_scripture::DATABASE_FILENAME);
             let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-            let input = match input {
-                Some(path) => path,
-                None => {
-                    let text = std::fs::read_to_string("config.toml")?;
-                    let config: toml::Value = toml::from_str(&text)?;
-                    let path = config
-                        .get("scripture-import")
-                        .and_then(|section| section.get("input_dir"))
-                        .and_then(toml::Value::as_str)
-                        .filter(|path| !path.trim().is_empty())
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("Set scripture-import.input_dir in config.toml")
-                        })?;
-                    std::path::PathBuf::from(path)
-                }
-            };
+            let text = std::fs::read_to_string("config.toml")?;
+            let settings: toml::Value = toml::from_str(&text)?;
+            let input = std::path::Path::new(bible_input_dir(&settings)?);
             let name = archon_scripture::DATABASE_NAME;
 
             let varda = vardadb::storage::backend::Storage::new(storage, config.server.node_id)?;
@@ -149,9 +149,9 @@ fn run_command(command: Commands) -> anyhow::Result<()> {
             let schema = schema.to_string_lossy().into_owned();
             std::fs::create_dir_all(&output)?;
             let ingest = tempfile::Builder::new()
-                .prefix(".scripture-import-")
+                .prefix(".bible-import-")
                 .tempdir_in(&output)?;
-            let rows = archon_scripture::import(&input, ingest.path(), storage)?;
+            let rows = archon_scripture::import(input, ingest.path(), storage)?;
             if registered.is_none() {
                 varda.create_database(name)?;
             }
@@ -294,5 +294,26 @@ fn run_app(
 
     if let Err(e) = app.run() {
         eprintln!("Application error: {}", e);
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn bible_import_config_precedence() {
+        let legacy = "[scripture-import]\ninput_dir = 'old'";
+        let current = "[bible-import]\ninput_dir = 'new'";
+        for (text, expected) in [
+            (legacy.to_owned(), "old"),
+            (current.to_owned(), "new"),
+            (format!("{legacy}\n{current}"), "new"),
+        ] {
+            assert_eq!(
+                bible_input_dir(&toml::from_str(&text).unwrap()).unwrap(),
+                expected
+            );
+        }
     }
 }

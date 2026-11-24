@@ -29,6 +29,8 @@ clap = { version = "4.5.59", features = ["derive"] }
 tower-http = { version = "0.5", features = ["cors"] }
 libc = "0.2"
 fastembed = "5.9.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+unicode-normalization = "0.1"
 regex = "1.12.3"
 anyhow = "1.0"
 async-graphql = "7.0"

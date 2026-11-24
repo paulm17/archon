@@ -7,8 +7,11 @@ port = 8000
 storage_path = "./db_data"
 embedding = true
 
-[scripture-import]
+[bible-import]
 input_dir = "./output/json"
+
+[ingest-new-gospel]
+input_dir = "/Volumes/Data/Users/paul/scratch/awakenJesus/books/gospel_of_jesus/chapters"
 
 [zenoh]
 # Mode: "peer" (default, forms mesh) or "client" (requires connect)
