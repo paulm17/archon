@@ -336,7 +336,7 @@ fn book_corpus(code: &str) -> &'static str {
     }
 }
 
-fn extract_header_text(value: &serde_json::Value) -> Option<String> {
+fn extract_header_text(value: &serde_json::Value, positioned_notes: bool) -> Option<String> {
     match value {
         serde_json::Value::String(s) => {
             let trimmed = s.trim();
@@ -347,7 +347,10 @@ fn extract_header_text(value: &serde_json::Value) -> Option<String> {
             }
         }
         serde_json::Value::Array(arr) => {
-            let parts: Vec<String> = arr.iter().filter_map(extract_header_text).collect();
+            let parts: Vec<String> = arr
+                .iter()
+                .filter_map(|part| extract_header_text(part, positioned_notes))
+                .collect();
             if parts.is_empty() {
                 None
             } else {
@@ -364,6 +367,12 @@ fn extract_header_text(value: &serde_json::Value) -> Option<String> {
                                 return Some(trimmed.to_string());
                             }
                         }
+                    }
+                    "footnote"
+                        if positioned_notes
+                            && map.get("number").and_then(|n| n.as_u64()).is_some() =>
+                    {
+                        return None;
                     }
                     "footnote" => {
                         if let Some(text) = map.get("text").and_then(|v| v.as_str()) {
@@ -399,7 +408,10 @@ fn extract_header_text(value: &serde_json::Value) -> Option<String> {
             }
 
             for key in ["text", "title", "heading", "content", "label", "value"] {
-                if let Some(text) = map.get(key).and_then(extract_header_text) {
+                if let Some(text) = map
+                    .get(key)
+                    .and_then(|part| extract_header_text(part, positioned_notes))
+                {
                     return Some(text);
                 }
             }
@@ -614,7 +626,40 @@ fn metadata_for_verse(chapter_file: &ChapterFile, verse: &VerseEntry) -> Option<
         meta.insert("inlineHeading".to_string(), serde_json::Value::String(text));
     }
 
-    let footnotes = metadata_footnotes_for_verse(chapter_file, verse);
+    let mut footnotes = metadata_footnotes_for_verse(chapter_file, verse);
+    let mut plural = Vec::new();
+    let mut annotate = |kind: &str, id: Option<&str>, offset: u64, target: &str| {
+        if kind == "plural" {
+            plural.push(serde_json::json!({ "offset": offset, "target": target }));
+        } else if kind == "footnote" {
+            if let Some(note) = footnotes.iter_mut().find(|n| n["id"].as_str() == id) {
+                note["offset"] = offset.into();
+                note["target"] = target.into();
+            }
+        }
+    };
+    if chapter_file.translation_code == "BLB" {
+        for item in &verse.content {
+            if let Some(offset) = item.number.and_then(|n| u64::try_from(n).ok()) {
+                annotate(&item.item_type, item.id.as_deref(), offset, "verse");
+            }
+        }
+        if let Some(items) = verse.header.as_ref().and_then(|h| h.as_array()) {
+            for item in items {
+                if let Some(offset) = item["number"].as_u64() {
+                    annotate(
+                        item["type"].as_str().unwrap_or(""),
+                        item["id"].as_str(),
+                        offset,
+                        "heading",
+                    );
+                }
+            }
+        }
+    }
+    if !plural.is_empty() {
+        meta.insert("pluralMarks".into(), plural.into());
+    }
     if !footnotes.is_empty() {
         meta.insert("footnotes".to_string(), serde_json::Value::Array(footnotes));
     }
@@ -635,7 +680,7 @@ fn metadata_for_verse(chapter_file: &ChapterFile, verse: &VerseEntry) -> Option<
 }
 
 /// Extract plain text from verse: uses content items for translations, words for interlinear.
-fn extract_verse_text(verse: &VerseEntry) -> String {
+fn extract_verse_text(verse: &VerseEntry, positioned_notes: bool) -> String {
     // If we have content items, use text/surface items (normal translations)
     if !verse.content.is_empty() {
         let mut result = String::new();
@@ -664,6 +709,7 @@ fn extract_verse_text(verse: &VerseEntry) -> String {
                         result.push_str(text);
                     }
                 }
+                "footnote" if positioned_notes && item.number.is_some() => {}
                 "footnote" => {
                     if let Some(text) = item.text.as_deref() {
                         result.push_str(&format!("[fn:{text}] "));
@@ -796,7 +842,10 @@ pub(crate) fn export(translations_dir: &Path, ingest_dir: &Path) -> Result<()> {
                                 text,
                                 words: v.words.clone(),
                                 logion_number: Some(v.verse),
-                                chapter_heading: v.header.as_ref().and_then(extract_header_text),
+                                chapter_heading: v
+                                    .header
+                                    .as_ref()
+                                    .and_then(|h| extract_header_text(h, false)),
                                 section_heading: None,
                                 paragraph_start: false,
                                 poetry_indent: None,
@@ -877,14 +926,18 @@ pub(crate) fn export(translations_dir: &Path, ingest_dir: &Path) -> Result<()> {
 
                 let chapter_verses = book.chapters.entry(chapter_file.chapter).or_default();
                 for v in &chapter_file.verses {
-                    let text = extract_verse_text(v);
+                    let positioned_notes = chapter_file.translation_code == "BLB";
+                    let text = extract_verse_text(v, positioned_notes);
                     if !text.is_empty() {
                         chapter_verses.entry(v.verse).or_default().push(VerseText {
                             translation_code: chapter_file.translation_code.clone(),
                             text,
                             words: v.words.clone(),
                             logion_number: None,
-                            chapter_heading: v.header.as_ref().and_then(extract_header_text),
+                            chapter_heading: v
+                                .header
+                                .as_ref()
+                                .and_then(|h| extract_header_text(h, positioned_notes)),
                             section_heading: if v.section.trim().is_empty() {
                                 None
                             } else {
