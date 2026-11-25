@@ -110,13 +110,13 @@ fn extracts_blb_and_cpdv_without_touching_existing_files() {
             r#"<span class="reftext"><a href="/luke/10-{verse}.htm"><b>{verse}</b></a></span>BLB verse {verse}."#
         ));
         if verse == 1 {
-            blb.push_str(r##"<span class="fn"><a href="#fn">‡</a></span>"##);
+            blb.push_str(r##" Given<span class="fn"><a href="#fn">†</a></span> to you⁺<span class="fn"><a href="#fn">†</a></span>."##);
         }
         cpdv.push_str(&format!("{{10:{verse}}} CPDV verse {verse}.<br>\n"));
     }
     blb.push_str(
         r#"<p><a name="fn"></a><br><b>Footnotes:</b><br>
-        <span class="fnverse">1</span> A <i>footnote</i>.<br></div></div>"#,
+        <span class="fnverse">1</span> A <i>footnote</i>.<br><span class="fnverse">1</span> Second note.<br></div></div>"#,
     );
     cpdv.push_str(
         r##"[<a class=chapter href="#top">Luke 11</a>]<br>{11:1} Next chapter.<br></font>"##,
@@ -179,9 +179,17 @@ fn extracts_blb_and_cpdv_without_touching_existing_files() {
     );
     assert_eq!(
         blb.verses[0].content[0].text.as_deref(),
-        Some("BLB verse 1.")
+        Some("BLB verse 1. Given to you.")
     );
     assert_eq!(blb.footnotes[0].text, "A footnote.");
+    assert_eq!(blb.footnotes[1].text, "Second note.");
+    let items = &blb.verses[0].content;
+    assert_eq!(items[1].text.as_deref(), Some("†"));
+    assert_eq!(items[1].number, Some(18));
+    assert_eq!(items[2].kind, "plural");
+    assert_eq!(items[2].number, Some(25));
+    assert_eq!(items[3].number, Some(25));
+    assert_eq!(items[3].id.as_ref(), Some(&blb.footnotes[1].id));
     assert_eq!(
         blb.verses[0].content[1].id.as_ref(),
         Some(&blb.footnotes[0].id)
