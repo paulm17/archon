@@ -61,9 +61,13 @@ impl Site for BibleHubBlb {
             paragraph_start: true,
             in_notes: false,
             current_note: None,
+            markers: Vec::new(),
+            skipped_prefix_notes: 0,
+            pending_plain_verse: None,
         };
         parser.walk(body)?;
         parser.flush();
+        parser.link_notes()?;
         ensure!(
             !parser.data.verses.is_empty(),
             "No BLB verses found for {}",
@@ -88,18 +92,42 @@ struct ChapterParser {
     paragraph_start: bool,
     in_notes: bool,
     current_note: Option<u32>,
+    markers: Vec<String>,
+    skipped_prefix_notes: usize,
+    pending_plain_verse: Option<u32>,
 }
 
 impl ChapterParser {
     fn walk(&mut self, parent: ElementRef<'_>) -> Result<()> {
         for child in parent.children() {
             match child.value() {
-                Node::Text(text) => self.text.push_str(text),
+                Node::Text(text) => {
+                    let mut text: &str = text;
+                    if !text.trim().is_empty() {
+                        if let Some(verse) = self.pending_plain_verse.take() {
+                            let trimmed = text.trim_start();
+                            let digits = trimmed.trim_start_matches(|ch: char| ch.is_ascii_digit());
+                            let label = &trimmed[..trimmed.len() - digits.len()];
+                            if label.parse::<u32>() == Ok(verse)
+                                && self
+                                    .data
+                                    .verses
+                                    .last()
+                                    .is_none_or(|previous| previous.verse < verse)
+                            {
+                                self.begin_verse(verse)?;
+                                text = digits;
+                            }
+                        }
+                    }
+                    self.text.push_str(text);
+                }
                 Node::Element(_) => {
                     let element = ElementRef::wrap(child).unwrap();
                     if element.value().name() == "a" && element.attr("name") == Some("fn") {
                         self.flush();
                         self.in_notes = true;
+                        self.pending_plain_verse = None;
                         continue;
                     }
                     if self.in_notes {
@@ -113,14 +141,27 @@ impl ChapterParser {
                             self.walk(element)?;
                         }
                     } else if has_class(element, "reftext") {
+                        self.pending_plain_verse = None;
                         self.start_verse(element)?;
+                    } else if element.value().name() == "a" && element.attr("href").is_none() {
+                        // BibleHub's legacy anchors name the next verse, even
+                        // when the visible number is printed without a link.
+                        self.pending_plain_verse = element
+                            .attr("name")
+                            .and_then(|name| name.parse::<u32>().ok())
+                            .and_then(|number| number.checked_sub(1))
+                            .filter(|number| *number > 0);
+                        self.walk(element)?;
                     } else if is_heading(element) {
                         self.flush();
-                        let heading = heading_text(element);
-                        if !heading.is_empty() {
-                            self.headings.push(ContentItem::text("text", heading));
-                        }
-                    } else if has_class(element, "fn") || has_class(element, "cross") {
+                        let mut text = String::new();
+                        collect_heading(element, &mut text, &mut self.markers);
+                        append_annotated_text(&mut self.headings, &text);
+                    } else if has_class(element, "fn") {
+                        self.markers
+                            .push(normalized(&element.text().collect::<String>()));
+                        self.text.push(NOTE_ANCHOR);
+                    } else if has_class(element, "cross") {
                         continue;
                     } else {
                         if element.value().name() == "p" {
@@ -167,6 +208,10 @@ impl ChapterParser {
             number => number.parse::<u32>()?,
         };
         self.has_chapter_link |= target.is_some();
+        self.begin_verse(verse)
+    }
+
+    fn begin_verse(&mut self, verse: u32) -> Result<()> {
         self.flush();
         ensure!(
             self.data
@@ -197,18 +242,6 @@ impl ChapterParser {
                     self.data.chapter,
                     self.data.footnotes.len() + 1
                 );
-                if let Ok(index) = self
-                    .data
-                    .verses
-                    .binary_search_by_key(&number, |verse| verse.verse)
-                {
-                    self.data.verses[index].content.push(ContentItem::new(
-                        "footnote",
-                        Some("‡".into()),
-                        None,
-                        Some(id.clone()),
-                    ));
-                }
                 self.data.footnotes.push(Footnote {
                     id,
                     text,
@@ -216,8 +249,44 @@ impl ChapterParser {
                 });
             }
         } else if let Some(verse) = self.data.verses.last_mut().filter(|_| !text.is_empty()) {
-            verse.content.push(ContentItem::text("text", text));
+            append_annotated_text(&mut verse.content, &text);
+        } else if !self.in_notes {
+            // Legacy inputs can contain unnumbered opening text before the first
+            // recognised verse. Keep those footer bodies at chapter level.
+            self.skipped_prefix_notes += text.matches(NOTE_ANCHOR).count();
         }
+    }
+
+    fn link_notes(&mut self) -> Result<()> {
+        ensure!(
+            self.markers.len() == self.data.footnotes.len(),
+            "BLB {} {}: {} anchors for {} notes",
+            self.data.book_code,
+            self.data.chapter,
+            self.markers.len(),
+            self.data.footnotes.len()
+        );
+        let mut notes = self
+            .markers
+            .iter()
+            .zip(&self.data.footnotes)
+            .skip(self.skipped_prefix_notes);
+        for verse in &mut self.data.verses {
+            for item in verse.header.iter_mut().chain(&mut verse.content) {
+                if item.kind == "footnote" {
+                    let (marker, note) = notes.next().context("Missing BLB note")?;
+                    item.id = Some(note.id.clone());
+                    item.text = Some(marker.clone());
+                }
+            }
+        }
+        ensure!(
+            notes.next().is_none(),
+            "Unplaced BLB footnote in {} {}",
+            self.data.book_code,
+            self.data.chapter
+        );
+        Ok(())
     }
 }
 
@@ -231,22 +300,65 @@ fn is_heading(element: ElementRef<'_>) -> bool {
         .any(|class| has_class(element, class))
 }
 
-fn heading_text(element: ElementRef<'_>) -> String {
-    let text = element
-        .descendants()
-        .filter_map(|node| {
-            let Node::Text(text) = node.value() else {
-                return None;
-            };
-            let in_cross_reference = node
-                .ancestors()
-                .take_while(|ancestor| ancestor.id() != element.id())
-                .filter_map(ElementRef::wrap)
-                .any(|ancestor| has_class(ancestor, "cross"));
-            (!in_cross_reference).then_some(&**text)
-        })
-        .collect::<String>();
-    normalized(&text)
+// A temporary boundary in the DOM text buffer. Never written to chapter JSON.
+const NOTE_ANCHOR: char = '\u{fdd0}';
+
+fn collect_heading(element: ElementRef<'_>, text: &mut String, markers: &mut Vec<String>) {
+    for child in element.children() {
+        match child.value() {
+            Node::Text(value) => text.push_str(value),
+            Node::Element(_) => {
+                let node = ElementRef::wrap(child).unwrap();
+                if has_class(node, "fn") {
+                    markers.push(normalized(&node.text().collect::<String>()));
+                    text.push(NOTE_ANCHOR);
+                } else if !has_class(node, "cross") {
+                    collect_heading(node, text, markers);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn append_annotated_text(items: &mut Vec<ContentItem>, raw: &str) {
+    // Offsets use UTF-16 to match browser text-selection offsets.
+    let previous_length = items
+        .iter()
+        .filter(|item| item.kind == "text")
+        .filter_map(|item| item.text.as_ref())
+        .map(|s| s.encode_utf16().count() + 1)
+        .sum::<usize>();
+    let mut offset = previous_length;
+    let mut text = String::new();
+    let mut annotations = Vec::new();
+    let mut space = false;
+    for ch in raw.chars() {
+        match ch {
+            NOTE_ANCHOR | '⁺' => {
+                let kind = if ch == NOTE_ANCHOR {
+                    "footnote"
+                } else {
+                    "plural"
+                };
+                annotations.push(ContentItem::new(kind, None, Some(offset as u32), None));
+            }
+            ch if ch.is_whitespace() => space = !text.is_empty(),
+            ch => {
+                if space {
+                    text.push(' ');
+                    offset += 1;
+                    space = false;
+                }
+                text.push(ch);
+                offset += ch.len_utf16();
+            }
+        }
+    }
+    if !text.is_empty() {
+        items.push(ContentItem::text("text", text));
+    }
+    items.extend(annotations);
 }
 
 #[cfg(test)]
