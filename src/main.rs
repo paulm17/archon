@@ -53,6 +53,10 @@ enum Commands {
     },
     /// Convert chapter JSON to JSONL and bulk-load a new scripture database
     BibleImport,
+    /// Rebuild only BLB from the saved HTML and stage before/after exports for a targeted repair.
+    PrepareBlbRepair {
+        directory: std::path::PathBuf,
+    },
     CompareNewGospel(new_gospel::compare::Cli),
     IngestNewGospel(new_gospel::ingest::Cli),
     ExportNewGospel(new_gospel::export::Cli),
@@ -122,6 +126,30 @@ fn run_command(command: Commands) -> anyhow::Result<()> {
                     report.failed.len()
                 );
             }
+        }
+        Commands::PrepareBlbRepair { directory } => {
+            std::fs::create_dir(&directory)?;
+            let legacy = directory.join("legacy");
+            for entry in walkdir::WalkDir::new(output.join("json/en/BLB")).min_depth(2) {
+                let file = entry?;
+                if file.file_type().is_file()
+                    && file.path().extension().is_some_and(|ext| ext == "json")
+                {
+                    let rel = file.path().strip_prefix(output.join("json"))?;
+                    let dest = legacy.join(rel);
+                    std::fs::create_dir_all(dest.parent().unwrap())?;
+                    std::fs::copy(file.path(), dest)?;
+                }
+            }
+            archon_scripture::generate_jsonl(&legacy, &directory.join("before"))?;
+            let result =
+                archon_json::rebuild_from_archive(&output.join("gospels"), &directory, "BLB")?;
+            result.print_failures();
+            anyhow::ensure!(
+                result.failed.is_empty() && result.converted > 0,
+                "Incomplete BLB rebuild"
+            );
+            archon_scripture::generate_jsonl(&directory.join("json"), &directory.join("after"))?;
         }
         Commands::BibleImport => {
             let config = startup::load_varda_config("config.toml")
