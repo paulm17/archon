@@ -15,6 +15,7 @@ export type PassageRef = {
 };
 
 export type FootnoteItem = {
+  marker?: string;
   chapter: number;
   verse: number;
   noteId: string;

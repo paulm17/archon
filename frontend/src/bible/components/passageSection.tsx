@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Box, Text, Title, Tooltip } from '@mantine/core';
+import { Box, Popover, Text, Title, Tooltip } from '@mantine/core';
 import { usePage } from '../pageContext';
+import type { FootnoteItem } from '../types';
 import { usePanes } from '../paneContext';
 
 type PaneReg = {
@@ -107,6 +108,7 @@ export function PassageSection({ html, index, paneId, tabId }: passageSectionPro
       show_cr: boolean;
       baseChapter: number;
       isThomas: boolean;
+      positionedNotes: Map<string, FootnoteItem>;
       fnTips: Map<string, string>;
       crTips: Map<string, string>;
     },
@@ -115,7 +117,7 @@ export function PassageSection({ html, index, paneId, tabId }: passageSectionPro
   ) {
     const nodes: any[] = [];
     let lastIndex = 0;
-    const re = /\[(vs|cr|fn|inline):([^\]]+)\]/g;
+    const re = /\[(vs|cr|fn|note|inline):([^\]]+)\]/g;
     let m: RegExpExecArray | null;
     let hasInline = false;
 
@@ -181,6 +183,18 @@ export function PassageSection({ html, index, paneId, tabId }: passageSectionPro
         } else {
           nodes.push(' ');
         }
+      } else if (kind === 'note') {
+        const note = opts.positionedNotes.get(val);
+        if (note) {
+          nodes.push(
+            <Popover key={`${keyPrefix}-note-${m.index}`} withArrow>
+              <Popover.Target>
+                <button type="button" className="marker marker-fn" aria-label={`Footnote for verse ${note.verse}`}>{note.marker}</button>
+              </Popover.Target>
+              <Popover.Dropdown>{note.text}</Popover.Dropdown>
+            </Popover>
+          );
+        }
       } else if (kind === 'fn') {
         if (opts.show_fn) {
           const label = String(val).toLowerCase();
@@ -223,6 +237,7 @@ export function PassageSection({ html, index, paneId, tabId }: passageSectionPro
       show_cr: boolean;
       baseChapter: number;
       isThomas: boolean;
+      positionedNotes: Map<string, FootnoteItem>;
       fnTips: Map<string, string>;
       crTips: Map<string, string>;
     }
@@ -473,6 +488,7 @@ export function PassageSection({ html, index, paneId, tabId }: passageSectionPro
           show_cr: activeTab.footerOpen && activeTab.footerTab === 'crossrefs',
           baseChapter,
           isThomas: result.reference.bookCode === 'Thomas',
+          positionedNotes: new Map((result.footnotes ?? []).map(note => [encodeURIComponent(note.noteId), note])),
           fnTips,
           crTips,
         })}

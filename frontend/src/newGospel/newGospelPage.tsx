@@ -34,6 +34,7 @@ type SupportingReferenceDisplay = {
 };
 
 type VerseMark = {
+  cleanText?: boolean;
   id: string;
   rowKey: string;
   translation: string;
@@ -101,6 +102,7 @@ type ReferenceContext = {
 };
 
 type ArchonVerseContent = {
+  pluralOffsets?: number[];
   text: string;
   translationName: string;
   translationCode: string | null;
@@ -129,6 +131,7 @@ type ArchonVerseRecord = {
 
 type ArchonVerseQueryResult = {
   queryVerse?: Array<{
+    metadata?: string | null;
     number?: number | null;
     verseContents?: Array<{
       text?: string | null;
@@ -190,6 +193,7 @@ type FixedInterlinearQueryResult = {
 };
 
 type LinkedVerseRow = {
+  pluralOffsets?: number[];
   rights?: string;
   key: string;
   translationName: string;
@@ -257,7 +261,9 @@ const TCNT = { name: 'Twentieth Century New Testament', rights: PUBLIC_DOMAIN };
 const BIBLE_TRANSLATIONS = new Map([
   ["OEB", { name: "Open English Bible", rights: "Public domain (CC0)" }],
   ["ASV", { name: "American Standard Version", rights: PUBLIC_DOMAIN }],
+  ["BLB", { name: "Berean Literal Bible", rights: PUBLIC_DOMAIN }],
   ["BSB", { name: "Berean Standard Bible", rights: PUBLIC_DOMAIN }],
+  ["CPDV", { name: "Catholic Public Domain Version", rights: PUBLIC_DOMAIN }],
   ["DARBY", { name: "Darby Translation", rights: PUBLIC_DOMAIN }],
   ["DRA", { name: "Douay-Rheims 1899 American Edition", rights: PUBLIC_DOMAIN }],
   ["TCNT", TCNT],
@@ -549,6 +555,14 @@ function normalizeNewGospelVerse(result: NewGospelVerseQueryResult): NewGospelVe
   };
 }
 
+function blbPluralOffsets(metadata?: string | null): number[] {
+  if (!metadata) return [];
+  const marks = JSON.parse(metadata)?.pluralMarks;
+  if (!Array.isArray(marks)) return [];
+  return marks.filter(mark => mark.target === 'verse' && Number.isInteger(mark.offset))
+    .map(mark => mark.offset);
+}
+
 function normalizeArchonVerse(result: ArchonVerseQueryResult): ArchonVerseRecord[] {
   return (result.queryVerse ?? [])
     .flatMap((verse) => {
@@ -567,6 +581,8 @@ function normalizeArchonVerse(result: ArchonVerseQueryResult): ArchonVerseRecord
           }
 
           return [{
+            pluralOffsets: content.translation.code?.toUpperCase() === 'BLB' || content.translation.name === 'Berean Literal Bible'
+              ? blbPluralOffsets(verse.metadata) : undefined,
             text: content.text,
             translationName: content.translation.name,
             translationCode: content.translation.code ?? null,
@@ -898,8 +914,19 @@ function readVerseMarks(value: string | null): VerseMark[] {
 }
 
 function highlightedVerseText(row: LinkedVerseRow, marks: VerseMark[], deleteMark: (id: string) => void) {
-  const ranges = marks.filter((mark) => mark.rowKey === row.key && mark.end <= row.text.length
-    && row.text.slice(mark.start, mark.end) === mark.text);
+  const ranges = marks.filter(mark => mark.rowKey === row.key).flatMap(mark => {
+    if (!mark.cleanText && row.pluralOffsets) {
+      // Older BLB selections counted the superscript plus signs in their offsets.
+      const originalOffsets = row.pluralOffsets.map((offset, index) => offset + index);
+      const project = (offset: number) => Math.min(row.text.length,
+        offset - originalOffsets.filter(position => position < offset).length);
+      const start = project(mark.start);
+      const end = project(mark.end);
+      const words = mark.text.replace(/⁺|\[fn:‡\]/gu, '').trimEnd();
+      if (start < end && row.text.slice(start, end) === words) return [{ ...mark, start, end }];
+    }
+    return row.text.slice(mark.start, mark.end) === mark.text && mark.end <= row.text.length ? [mark] : [];
+  });
   const boundaries = [...new Set([0, ...ranges.flatMap(({ start, end }) => [start, end]), row.text.length])]
     .sort((left, right) => left - right);
 
@@ -999,6 +1026,7 @@ async function fetchArchonVerses(reference: ParsedReference): Promise<ArchonVers
             }) {
               id
               number
+              metadata
               verseContents {
                 id
                 text
@@ -1233,6 +1261,7 @@ async function buildLinkedVerseRows(
 
           const currentRows = grouped.get(content.translationName) ?? [];
           currentRows.push({
+            pluralOffsets: content.pluralOffsets,
             rights: translation?.rights,
             key: `${content.translationName}-${reference.display}-${parsedReference.bookCode}-${parsedReference.chapter}-${verse.number}-${currentRows.length}`,
             translationName: content.translationName,
@@ -1537,6 +1566,7 @@ export function NewGospelPage() {
     selection.removeAllRanges();
     updateMarks([...marks, {
       id: Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) => value.toString(16).padStart(8, '0')).join(''),
+      cleanText: true,
       rowKey: row.key,
       translation: row.translationName,
       reference: row.referenceLabel,

@@ -745,7 +745,7 @@ function renderVersesToHtml(
     const chapterHeading = deriveChapterHeading(v);
     
     // Inject marker processing here
-    let content = ensureVerseMarker(getVerseText(v), v.number);
+    let content = ensureVerseMarker(withFootnoteAnchors(getVerseText(v), v.metadata, "verse"), v.number);
     content = processContentMarkers(content, v);
 
     const inlineHeading = deriveInlineHeading(v);
@@ -760,7 +760,7 @@ function renderVersesToHtml(
     // Emit chapter heading
     if (chapterHeading && chapterHeading !== lastChapterHeading) {
       flushParagraph();
-      parts.push(`<h3>${chapterHeading}</h3>`);
+      parts.push(`<h3>${withFootnoteAnchors(chapterHeading, v.metadata, "heading")}</h3>`);
       lastChapterHeading = chapterHeading;
     }
 
@@ -854,6 +854,19 @@ function deriveInlineHeading(v: any): string | null {
    return null;
 }
 
+type AnchoredFootnote = { id: string; offset: number; target: string };
+
+function withFootnoteAnchors(text: string, metadata: { footnotes?: AnchoredFootnote[] } | null, target: string) {
+  const notes = Array.isArray(metadata?.footnotes) ? metadata.footnotes : [];
+  const anchors = notes.filter(note => note.target === target && Number.isInteger(note.offset)
+    && note.offset >= 0 && note.offset <= text.length);
+  // Insert right to left so offsets still refer to the original verse.
+  for (const note of anchors.reverse().sort((a, b) => b.offset - a.offset)) {
+    text = text.slice(0, note.offset) + `[note:${encodeURIComponent(note.id)}]` + text.slice(note.offset);
+  }
+  return text;
+}
+
 function getVerseText(v: any): string {
   const contents = Array.isArray(v?.verseContents) ? v.verseContents : [];
   return contents
@@ -903,6 +916,10 @@ function buildFootnotesFromMetaAndMarkers(verses: any[], chapterNumber: number):
     if (metaArr) {
       for (const entry of metaArr) {
         if (!entry) continue;
+        if (Number.isInteger(entry.offset) && entry.id) {
+          items.push({ ...entry, chapter: chapterNumber, verse: v.number, noteId: entry.id });
+          continue;
+        }
         const marker =
           (entry.marker as string) || (entry.id as string) || (entry.noteId as string) || '';
         if (marker) {

@@ -36,7 +36,7 @@ export function Footer({ paneId, activeTab, activeResult }: FooterProps) {
     const baseChapter = parsed ? parsed.baseChapter : fn.chapter;
     const baseVerse = parsed ? parsed.baseVerse : fn.verse;
 
-    let marker = parsed?.label?.toLowerCase() ?? '';
+    let marker = fn.marker ?? parsed?.label?.toLowerCase() ?? '';
     if (!marker) {
       const m = String(fn.noteId ?? '').match(/-(\w+)$/);
       if (m) marker = m[1].toLowerCase();
