@@ -10,8 +10,13 @@ embedding = true
 [bible-import]
 input_dir = "./output/json"
 
-[ingest-new-gospel]
-input_dir = "/Volumes/Data/Users/paul/scratch/awakenJesus/books/gospel_of_jesus/chapters"
+[new-gospel]
+import_dir = "/Volumes/Data/Users/paul/scratch/awakenJesus/books/gospel_of_jesus/chapters"
+export_dir = "./output/new_gospel"
+
+[new-gospel.marks]
+import_file = "./output/new_gospel_marks.json"
+export_file = "./output/new_gospel_marks.json"
 
 [zenoh]
 # Mode: "peer" (default, forms mesh) or "client" (requires connect)

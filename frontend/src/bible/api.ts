@@ -205,8 +205,11 @@ export async function getTranslations(gospel: GospelSelection = 'canonical'): Pr
     const query = `
       query GetCanonicalTranslations {
         queryBook(filter: { bookCorpus: { eq: "CANONICAL" } }) {
+          id
           bookTranslations {
+            id
             translation {
+              id
               code
               name
             }

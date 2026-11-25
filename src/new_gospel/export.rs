@@ -14,7 +14,7 @@ const CHAPTER_SUFFIX: &str = ".txt";
 const CHAPTER_SPLIT_AFTER: usize = 40;
 
 #[derive(Args, Debug)]
-#[command(about = "Export NewGospelVerse records into chapter text files")]
+#[command(about = "Export chapter text to new-gospel.export_dir in config.toml")]
 pub struct Cli {
     #[arg(long, default_value_os_t = default_db_dir())]
     db_dir: PathBuf,
@@ -47,7 +47,7 @@ impl DbTables {
     }
 }
 
-fn default_db_dir() -> PathBuf {
+pub(super) fn default_db_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("db_data")
 }
 
@@ -58,17 +58,21 @@ fn output_dir() -> PathBuf {
 }
 
 pub fn run(cli: Cli) -> Result<()> {
+    let settings = super::read_settings()?;
+    let directory = super::configured_path(&settings, &["new-gospel", "export_dir"])?
+        .unwrap_or_else(output_dir);
     let conn = open_db(&cli.db_dir)?;
     let tables = DbTables::for_db(DB_NAME);
     let verses = load_db_verses(&conn, &tables)?;
     let chapters = build_chapters(&verses);
 
-    write_chapters(&output_dir(), &chapters)?;
+    write_chapters(&directory, &chapters)?;
 
     println!(
-        "Exported {} verses into {} chapter files",
+        "Exported {} verses into {} chapter files in {}",
         verses.len(),
-        chapters.len()
+        chapters.len(),
+        directory.display()
     );
 
     Ok(())
@@ -92,27 +96,7 @@ fn open_db(db_dir: &Path) -> Result<Connection> {
 }
 
 fn load_db_verses(conn: &Connection, tables: &DbTables) -> Result<Vec<DbVerse>> {
-    let mut stmt = conn.prepare(&format!("SELECT key, value FROM \"{}\"", tables.main))?;
-    let rows = stmt.query_map([], |row| {
-        let key: Vec<u8> = row.get(0)?;
-        let value: Vec<u8> = row.get(1)?;
-        Ok((key, value))
-    })?;
-
-    let mut fields: BTreeMap<u64, BTreeMap<String, Value>> = BTreeMap::new();
-    for row in rows {
-        let (key, value) = row?;
-        if key.first().copied() != Some(0x01) || key.len() < 9 || value.len() < 16 {
-            continue;
-        }
-
-        let uid = u64::from_be_bytes(key[1..9].try_into().expect("uid slice length checked"));
-        let field = String::from_utf8_lossy(&key[9..]).into_owned();
-        let parsed = serde_json::from_slice::<Value>(&value[16..])
-            .with_context(|| format!("decoding field {field} for uid {uid}"))?;
-        fields.entry(uid).or_default().insert(field, parsed);
-    }
-
+    let fields = load_fields(conn, &tables.main)?;
     let mut verses = Vec::new();
     for record in fields.values() {
         if record.get("_type").and_then(Value::as_str) != Some(VERSE_TYPE) {
@@ -150,6 +134,34 @@ fn load_db_verses(conn: &Connection, tables: &DbTables) -> Result<Vec<DbVerse>> 
 
     verses.sort_by_key(|verse| verse.number);
     Ok(verses)
+}
+
+pub(super) fn load_fields(
+    conn: &Connection,
+    table: &str,
+) -> Result<BTreeMap<u64, BTreeMap<String, Value>>> {
+    let mut stmt = conn.prepare(&format!("SELECT key, value FROM \"{table}\""))?;
+    let rows = stmt.query_map([], |row| {
+        let key: Vec<u8> = row.get(0)?;
+        let value: Vec<u8> = row.get(1)?;
+        Ok((key, value))
+    })?;
+
+    let mut fields: BTreeMap<u64, BTreeMap<String, Value>> = BTreeMap::new();
+    for row in rows {
+        let (key, value) = row?;
+        if key.first().copied() != Some(0x01) || key.len() < 9 || value.len() < 16 {
+            continue;
+        }
+
+        let uid = u64::from_be_bytes(key[1..9].try_into().expect("uid slice length checked"));
+        let field = String::from_utf8_lossy(&key[9..]).into_owned();
+        let parsed = serde_json::from_slice::<Value>(&value[16..])
+            .with_context(|| format!("decoding field {field} for uid {uid}"))?;
+        fields.entry(uid).or_default().insert(field, parsed);
+    }
+
+    Ok(fields)
 }
 
 fn load_supporting_references(

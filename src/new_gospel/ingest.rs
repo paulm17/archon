@@ -26,7 +26,7 @@ const SUPPORT_FIELD: &str = "supportingReferences";
 const APP_SCHEMA_PATH: &str = "schema/new_gospel.graphql";
 
 #[derive(Args, Debug)]
-#[command(about = "Import a custom gospel directly into db_data/new_gospel.db")]
+#[command(about = "Import chapter text from new-gospel.import_dir in config.toml")]
 pub struct Cli {
     #[arg(long)]
     db_dir: Option<PathBuf>,
@@ -107,22 +107,23 @@ pub fn run(cli: Cli) -> Result<()> {
     let db_dir = cli
         .db_dir
         .unwrap_or_else(|| PathBuf::from(config.server.storage_path));
+    let settings = super::read_settings()?;
+    let input_dir = match super::configured_path(&settings, &["new-gospel", "import_dir"])? {
+        Some(path) => path,
+        None => super::configured_path(&settings, &["ingest-new-gospel", "input_dir"])?
+            .context("Set new-gospel.import_dir in config.toml")?,
+    };
+    let verses = parse_all_files(&input_dir)?;
+    anyhow::ensure!(
+        !verses.is_empty(),
+        "No verses found in {}",
+        input_dir.display()
+    );
+
     let db_path = registered_db_path(&db_dir, config.server.node_id)?;
-    let settings: toml::Value =
-        toml::from_str(&fs::read_to_string("config.toml").context("reading config.toml")?)
-            .context("parsing config.toml")?;
-    let input_dir = settings
-        .get("ingest-new-gospel")
-        .and_then(|section| section.get("input_dir"))
-        .and_then(toml::Value::as_str)
-        .filter(|path| !path.trim().is_empty())
-        .context("Set ingest-new-gospel.input_dir in config.toml")?;
-    let verses = parse_all_files(Path::new(input_dir))?;
     let mut conn = open_db(&db_path)?;
     persist_db_schema(&db_dir)?;
     let tables = DbTables::for_db(DB_NAME);
-
-    anyhow::ensure!(!verses.is_empty(), "No verses found in {}", input_dir);
     create_tables(&conn, &tables)?;
     import_verses(&mut conn, &tables, &verses)?;
 

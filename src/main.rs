@@ -11,7 +11,7 @@ use tracing::info;
 #[command(
     name = "archon",
     about = "Archon desktop app and command-line tools",
-    after_help = "Examples:\n  cargo run --\n  cargo run -- --dev\n  cargo run -- scrape --dry-run --translation T4T --book GEN --chapter 1\n  cargo run -- scrape --translation T4T --book GEN --chapter 1\n  cargo run -- json --translation T4T\n  cargo run -- db --help\n  cargo run -- scrape --help\n  cargo run -- json --help"
+    after_help = "Examples:\n  cargo run --\n  cargo run -- --dev\n  cargo run -- scrape --dry-run --translation T4T --book GEN --chapter 1\n  cargo run -- scrape --translation T4T --book GEN --chapter 1\n  cargo run -- json --translation T4T\n  cargo run -- new-gospel --help\n  cargo run -- bible-import --help\n  cargo run -- db --help\n  cargo run -- scrape --help\n  cargo run -- json --help"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -53,13 +53,9 @@ enum Commands {
     },
     /// Convert chapter JSON to JSONL and bulk-load a new scripture database
     BibleImport,
-    /// Rebuild only BLB from the saved HTML and stage before/after exports for a targeted repair.
-    PrepareBlbRepair {
-        directory: std::path::PathBuf,
-    },
-    CompareNewGospel(new_gospel::compare::Cli),
-    IngestNewGospel(new_gospel::ingest::Cli),
-    ExportNewGospel(new_gospel::export::Cli),
+    /// Import, export, and compare New Gospel verses and manage saved verse marks
+    #[command(subcommand)]
+    NewGospel(new_gospel::Command),
     /// Database Management
     #[command(subcommand)]
     Db(vardadb::cli::DbCommands),
@@ -82,9 +78,7 @@ fn bible_input_dir(config: &toml::Value) -> anyhow::Result<&str> {
 fn run_command(command: Commands) -> anyhow::Result<()> {
     let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("output");
     match command {
-        Commands::CompareNewGospel(args) => new_gospel::compare::run(args)?,
-        Commands::IngestNewGospel(args) => new_gospel::ingest::run(args)?,
-        Commands::ExportNewGospel(args) => new_gospel::export::run(args)?,
+        Commands::NewGospel(command) => new_gospel::run(command)?,
         Commands::Db(command) => {
             let config = startup::load_varda_config("config.toml")
                 .map_err(|e| anyhow::anyhow!("Failed to load config.toml: {e}"))?;
@@ -126,30 +120,6 @@ fn run_command(command: Commands) -> anyhow::Result<()> {
                     report.failed.len()
                 );
             }
-        }
-        Commands::PrepareBlbRepair { directory } => {
-            std::fs::create_dir(&directory)?;
-            let legacy = directory.join("legacy");
-            for entry in walkdir::WalkDir::new(output.join("json/en/BLB")).min_depth(2) {
-                let file = entry?;
-                if file.file_type().is_file()
-                    && file.path().extension().is_some_and(|ext| ext == "json")
-                {
-                    let rel = file.path().strip_prefix(output.join("json"))?;
-                    let dest = legacy.join(rel);
-                    std::fs::create_dir_all(dest.parent().unwrap())?;
-                    std::fs::copy(file.path(), dest)?;
-                }
-            }
-            archon_scripture::generate_jsonl(&legacy, &directory.join("before"))?;
-            let result =
-                archon_json::rebuild_from_archive(&output.join("gospels"), &directory, "BLB")?;
-            result.print_failures();
-            anyhow::ensure!(
-                result.failed.is_empty() && result.converted > 0,
-                "Incomplete BLB rebuild"
-            );
-            archon_scripture::generate_jsonl(&directory.join("json"), &directory.join("after"))?;
         }
         Commands::BibleImport => {
             let config = startup::load_varda_config("config.toml")
